@@ -9,7 +9,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "/agent/repos/rustmaninoff/crates/cli/../../testdata/terraform-plan/sensitive_matrix.tfplan.json"
+                  "uri": "testdata/terraform-plan/sensitive_matrix.tfplan.json"
                 },
                 "region": {
                   "startLine": 1

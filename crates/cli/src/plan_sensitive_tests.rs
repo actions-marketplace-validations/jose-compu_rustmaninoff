@@ -55,6 +55,13 @@ pub(crate) fn all_report_blobs(
     blobs
 }
 
+fn normalize_golden_paths(blob: &str) -> String {
+    let marker = "testdata/terraform-plan/sensitive_matrix.tfplan.json";
+    let re = regex::Regex::new(r#"[^\s"]*testdata/terraform-plan/sensitive_matrix\.tfplan\.json"#)
+        .expect("regex");
+    re.replace_all(blob, marker).into_owned()
+}
+
 pub(crate) fn assert_no_canaries(blobs: &[(String, String)]) {
     for (name, blob) in blobs {
         assert!(!blob.contains(CANARY_SUBSTR), "canary leaked into {name}");
@@ -192,7 +199,8 @@ fn golden_cli_json_sarif_junit_snapshots() {
             )
         });
         assert_eq!(
-            golden, blob,
+            normalize_golden_paths(&golden),
+            normalize_golden_paths(&blob),
             "golden mismatch for {name}; set UPDATE_GOLDEN=1 to refresh"
         );
     }
@@ -210,7 +218,10 @@ fn golden_refresh_env_var() {
         .into_iter()
         .filter(|(name, _)| matches!(name.as_str(), "cli_default" | "json" | "sarif" | "junit"))
     {
-        fs::write(root.join(format!("sensitive_matrix.{name}.golden")), blob)
-            .expect("write golden");
+        fs::write(
+            root.join(format!("sensitive_matrix.{name}.golden")),
+            normalize_golden_paths(&blob),
+        )
+        .expect("write golden");
     }
 }

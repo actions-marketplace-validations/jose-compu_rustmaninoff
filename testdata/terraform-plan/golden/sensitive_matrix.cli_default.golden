@@ -2,6 +2,6 @@ Passed checks: 3, Failed checks: 1, Skipped checks: 0, Unknown checks: 0, Parse 
 
 Check: CKV_AWS_20: "Ensure the S3 bucket does not allow READ permissions to everyone"
 	FAILED for resource: aws_s3_bucket.root
-	File: /agent/repos/rustmaninoff/crates/cli/../../testdata/terraform-plan/sensitive_matrix.tfplan.json:1-1
+	File: testdata/terraform-plan/sensitive_matrix.tfplan.json:1-1
 	Severity: HIGH
 	Guide: Adapted from Checkov CKV_AWS_20. https://github.com/bridgecrewio/checkov

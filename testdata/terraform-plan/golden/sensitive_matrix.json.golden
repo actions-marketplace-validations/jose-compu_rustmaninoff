@@ -9,7 +9,7 @@
           1,
           1
         ],
-        "file_path": "/agent/repos/rustmaninoff/crates/cli/../../testdata/terraform-plan/sensitive_matrix.tfplan.json",
+        "file_path": "testdata/terraform-plan/sensitive_matrix.tfplan.json",
         "framework": "terraform_plan",
         "guideline": "Adapted from Checkov CKV_AWS_20. https://github.com/bridgecrewio/checkov",
         "resource": "aws_s3_bucket.root",
@@ -27,7 +27,7 @@
           1,
           1
         ],
-        "file_path": "/agent/repos/rustmaninoff/crates/cli/../../testdata/terraform-plan/sensitive_matrix.tfplan.json",
+        "file_path": "testdata/terraform-plan/sensitive_matrix.tfplan.json",
         "framework": "terraform_plan",
         "guideline": "Adapted from Checkov CKV_AWS_20. https://github.com/bridgecrewio/checkov",
         "resource": "aws_s3_bucket.items",
@@ -42,7 +42,7 @@
           1,
           1
         ],
-        "file_path": "/agent/repos/rustmaninoff/crates/cli/../../testdata/terraform-plan/sensitive_matrix.tfplan.json",
+        "file_path": "testdata/terraform-plan/sensitive_matrix.tfplan.json",
         "framework": "terraform_plan",
         "guideline": "Adapted from Checkov CKV_AWS_20. https://github.com/bridgecrewio/checkov",
         "resource": "aws_s3_bucket.module.child.logs",
@@ -57,7 +57,7 @@
           1,
           1
         ],
-        "file_path": "/agent/repos/rustmaninoff/crates/cli/../../testdata/terraform-plan/sensitive_matrix.tfplan.json",
+        "file_path": "testdata/terraform-plan/sensitive_matrix.tfplan.json",
         "framework": "terraform_plan",
         "guideline": "Adapted from Checkov CKV_AWS_20. https://github.com/bridgecrewio/checkov",
         "resource": "aws_s3_bucket.nested",
