@@ -571,6 +571,8 @@ mod coverage;
 #[cfg(test)]
 mod pack_tests;
 #[cfg(test)]
+mod plan_sensitive_tests;
+#[cfg(test)]
 mod plan_tests;
 #[cfg(test)]
 mod safety_tests;

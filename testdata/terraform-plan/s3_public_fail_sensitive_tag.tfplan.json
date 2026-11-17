@@ -1,0 +1,34 @@
+{
+  "format_version": "1.2",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "aws_s3_bucket.bad",
+          "mode": "managed",
+          "type": "aws_s3_bucket",
+          "name": "bad",
+          "values": {
+            "bucket": "data",
+            "acl": "public-read",
+            "tags": {
+              "token": "SENSITIVE_CANARY_ACL_PAIR"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "resource_changes": [
+    {
+      "address": "aws_s3_bucket.bad",
+      "change": {
+        "sensitive_values": {
+          "tags": {
+            "token": true
+          }
+        }
+      }
+    }
+  ]
+}

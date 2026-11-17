@@ -1,0 +1,80 @@
+{
+  "results": {
+    "failed_checks": [
+      {
+        "check_id": "CKV_AWS_20",
+        "check_name": "Ensure the S3 bucket does not allow READ permissions to everyone",
+        "check_result": "FAILED",
+        "file_line_range": [
+          1,
+          1
+        ],
+        "file_path": "/agent/repos/rustmaninoff/crates/cli/../../testdata/terraform-plan/sensitive_matrix.tfplan.json",
+        "framework": "terraform_plan",
+        "guideline": "Adapted from Checkov CKV_AWS_20. https://github.com/bridgecrewio/checkov",
+        "resource": "aws_s3_bucket.root",
+        "severity": "HIGH",
+        "skip_reason": null
+      }
+    ],
+    "parse_errors": [],
+    "passed_checks": [
+      {
+        "check_id": "CKV_AWS_20",
+        "check_name": "Ensure the S3 bucket does not allow READ permissions to everyone",
+        "check_result": "PASSED",
+        "file_line_range": [
+          1,
+          1
+        ],
+        "file_path": "/agent/repos/rustmaninoff/crates/cli/../../testdata/terraform-plan/sensitive_matrix.tfplan.json",
+        "framework": "terraform_plan",
+        "guideline": "Adapted from Checkov CKV_AWS_20. https://github.com/bridgecrewio/checkov",
+        "resource": "aws_s3_bucket.items",
+        "severity": "HIGH",
+        "skip_reason": null
+      },
+      {
+        "check_id": "CKV_AWS_20",
+        "check_name": "Ensure the S3 bucket does not allow READ permissions to everyone",
+        "check_result": "PASSED",
+        "file_line_range": [
+          1,
+          1
+        ],
+        "file_path": "/agent/repos/rustmaninoff/crates/cli/../../testdata/terraform-plan/sensitive_matrix.tfplan.json",
+        "framework": "terraform_plan",
+        "guideline": "Adapted from Checkov CKV_AWS_20. https://github.com/bridgecrewio/checkov",
+        "resource": "aws_s3_bucket.module.child.logs",
+        "severity": "HIGH",
+        "skip_reason": null
+      },
+      {
+        "check_id": "CKV_AWS_20",
+        "check_name": "Ensure the S3 bucket does not allow READ permissions to everyone",
+        "check_result": "PASSED",
+        "file_line_range": [
+          1,
+          1
+        ],
+        "file_path": "/agent/repos/rustmaninoff/crates/cli/../../testdata/terraform-plan/sensitive_matrix.tfplan.json",
+        "framework": "terraform_plan",
+        "guideline": "Adapted from Checkov CKV_AWS_20. https://github.com/bridgecrewio/checkov",
+        "resource": "aws_s3_bucket.nested",
+        "severity": "HIGH",
+        "skip_reason": null
+      }
+    ],
+    "skipped_checks": [],
+    "unknown_checks": []
+  },
+  "summary": {
+    "failed": 1,
+    "parse_errors": 0,
+    "passed": 3,
+    "skipped": 0,
+    "unknown": 0
+  },
+  "tool": "rustmaninoff",
+  "version": "0.5.1"
+}
