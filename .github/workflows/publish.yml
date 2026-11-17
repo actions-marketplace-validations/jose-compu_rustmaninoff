@@ -23,15 +23,18 @@ jobs:
           crates=(
             rustmaninoff-ir
             rustmaninoff-engine
+            rustmaninoff-report
             rustmaninoff-parser-terraform
             rustmaninoff-parser-cfn
             rustmaninoff-parser-k8s
             rustmaninoff-parser-docker
-            rustmaninoff-report
             rustmaninoff
           )
           for crate in "${crates[@]}"; do
-            if curl -fsS -o /dev/null "https://crates.io/api/v1/crates/${crate}/${version}"; then
+            if code="$(curl -sS -o /dev/null -w '%{http_code}' \
+              -H 'User-Agent: rustmaninoff-publish (github-actions)' \
+              "https://crates.io/api/v1/crates/${crate}/${version}")" \
+              && [ "$code" = "200" ]; then
               echo "Skipping ${crate} ${version}: already on crates.io"
             else
               echo "Publishing ${crate} ${version}"
