@@ -475,8 +475,8 @@ fn resource_ref_from_address(address: &str) -> Option<ResourceRef> {
     ))
 }
 
-#[doc(hidden)]
-pub fn sensitive_paths_for_test(
+#[cfg(test)]
+pub(crate) fn sensitive_paths_for_test(
     plan: &serde_json::Value,
 ) -> HashMap<String, BTreeMap<String, bool>> {
     sensitive_keys(plan)
