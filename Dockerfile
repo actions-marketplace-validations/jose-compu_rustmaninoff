@@ -13,7 +13,7 @@ RUN cargo build --release --locked -p rustmaninoff \
 
 FROM debian:bookworm-slim AS build-release
 ARG TARGETARCH
-ARG VERSION=0.4.1
+ARG VERSION=0.5.1
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*

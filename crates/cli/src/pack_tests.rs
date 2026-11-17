@@ -46,12 +46,16 @@ fn assert_fixture(
     let framework = policy.framework.expect("framework");
     let name = match framework {
         Framework::Terraform => "fixture.tf",
+        Framework::TerraformPlan => "fixture.tfplan.json",
         Framework::CloudFormation => "fixture.yaml",
         Framework::Kubernetes => "fixture.yaml",
         Framework::Docker => "Dockerfile",
     };
     let output = match framework {
         Framework::Terraform => rustmaninoff_parser_terraform::parse_file(Path::new(name), source),
+        Framework::TerraformPlan => {
+            rustmaninoff_parser_terraform::parse_plan(Path::new(name), source)
+        }
         Framework::CloudFormation => rustmaninoff_parser_cfn::parse_file(Path::new(name), source),
         Framework::Kubernetes => rustmaninoff_parser_k8s::parse_file(Path::new(name), source),
         Framework::Docker => rustmaninoff_parser_docker::parse_file(Path::new(name), source),
