@@ -6,7 +6,7 @@ Position, unchanged: Checkov-compatible CKV policies, one Rust binary, fast. Run
 
 ## How a day ships
 
-1. Take the first unchecked box under the earliest open milestone.
+1. If [Next patch](#next-patch) has an open box, take that box. Otherwise take the first unchecked box under the earliest open milestone.
 2. Ship it as the next **patch** (`0.5.2`, `0.5.3`, …). One box, one release.
 3. Tick the box in this file in that same release.
 4. When every box in a milestone is ticked, the next release is the **minor** that closes it (`0.6.0`, then `0.7.0`, …). The minor is the close, not a second copy of the work.
@@ -18,7 +18,7 @@ Position, unchanged: Checkov-compatible CKV policies, one Rust binary, fast. Run
 
 | Bump | When | Example |
 | --- | --- | --- |
-| Patch `0.x.Y` | A fix, a false positive, a speed or docs change, hardening, or one new check inside the open milestone. This is the default daily release. | `0.5.2` ships the SARIF path fix |
+| Patch `0.x.Y` | A fix, a false positive, a speed or docs change, hardening, or one new check inside the open milestone. This is the default daily release. | `0.5.2` ships the CI benchmark |
 | Minor `0.X.0` | The open milestone's boxes are all ticked, or the release adds a framework, an output format, or a scan mode | `0.6.0` closes plan-scan hardening; `0.10.0` adds Helm |
 | `1.0.0` | The exit criteria below are all true | Stable CLI, stable library API, parity thresholds |
 
@@ -85,9 +85,15 @@ Known engine limits that later boxes depend on:
 - There is no `SECURITY.md`, no `rust-version` field, and no Windows target. CI uses `dtolnay/rust-toolchain@stable`. The README build line says Rust 1.95 or newer.
 - Workspace `homepage` equals `repository`, and `[workspace.package] readme` is unused. `cargo test` warns. 0.5.1 is already published with those fields ([#85](https://github.com/jose-compu/rustmaninoff/issues/85)).
 
+## Next patch
+
+Ship this before every milestone box, including the SARIF path fix in 0.6.0 ([#84](https://github.com/jose-compu/rustmaninoff/issues/84)). One patch. It does not close 0.17.0.
+
+- [ ] Benchmark in CI with regression reporting ([#89](https://github.com/jose-compu/rustmaninoff/issues/89)). On every pull request and on pushes to `main`, build this commit and `main` on the same runner and scan fixed corpora: a large Terraform tree, Kubernetes, CloudFormation, Dockerfiles, and a Terraform plan JSON. Several iterations; report the median and the spread. Write the table (baseline, pull request, absolute delta, percent delta, peak memory when available) to the job summary and to one sticky pull request comment. Warn above 5% slower. Fail above 15% slower. Both limits are configuration. Keep `main`'s medians as a workflow artifact or on a data branch. An unexplained fail stays red.
+
 ## Milestones
 
-Each box is one patch unless the text says it is the minor closer.
+Each box is one patch unless the text says it is the minor closer. The [next patch](#next-patch) is ahead of this list.
 
 ### 0.6.0 — Plan scans and SARIF that match the CI artifact
 
@@ -276,12 +282,11 @@ Same rule as Azure. The snapshot has no `CKV_GCP_5` or `CKV_GCP_19`; the list be
 
 ### 0.17.0 — Speed on a large repository
 
-Goal: keep the published synthetic corpus honest, and add one large real repository so a daily patch can see a regression. The README figures (0.4.0 binary, 54 ms median on 1,540 resources) stay historical; new runs append to `benchmarks/history.json` and do not rewrite old rows. Does not block 1.0 except the exit-criteria line that the bench script still runs.
+Goal: widen the corpus after the CI regression job in [Next patch](#next-patch) ([#89](https://github.com/jose-compu/rustmaninoff/issues/89)) is already required. The README figures (0.4.0 binary, 54 ms median on 1,540 resources) stay historical; new runs append to `benchmarks/history.json` and do not rewrite old rows. The CI gate itself is not this milestone. Does not block 1.0 beyond the exit-criteria line for that gate.
 
-- [ ] Pin a second public repository (larger than `terraform-aws-modules/terraform-aws-s3-bucket@v4.1.2`) in `scripts/bench.sh`, with a commit SHA.
+- [ ] Pin a second public repository (larger than `terraform-aws-modules/terraform-aws-s3-bucket@v4.1.2`) in `scripts/bench.sh`, with a commit SHA. The CI job may keep using the smaller pinned sample until this lands.
 - [ ] Record wall time and peak RSS for the synthetic corpus and that repository in `benchmarks/history.json`.
-- [ ] CI job: run the in-process stage example on the synthetic corpus and fail if it exceeds a budget written in `benchmarks/README.md`. The budget is for the CI runner, not the 54 ms laptop figure.
-- [ ] Minor closer: `./scripts/bench.sh` fills both rows and the CI budget job is required on pull requests.
+- [ ] Minor closer: `./scripts/bench.sh` fills both rows. Do not add a second CI budget. The 5% / 15% job from [#89](https://github.com/jose-compu/rustmaninoff/issues/89) is the gate.
 
 ### 0.18.0 — Library API and MSRV
 
@@ -352,7 +357,7 @@ Tag `1.0.0` when every line below is true. Milestones marked as not blocking 1.0
 - [ ] CloudFormation and graph sections of fidelity.md publish a scraped denominator (the first boxes of 0.12 and 0.13), even if the 80% and 40-id targets are still open.
 - [ ] `SECURITY.md` and `CONTRIBUTING.md` exist. The project site roadmap describes these milestones and does not offer CVE scanning.
 - [ ] `cargo test --workspace` is green, including `builtin_pack_covers_at_least_160_policies_with_fixtures` (every built-in policy still has pass and fail fixtures). `cargo fmt` and `cargo clippy --workspace --all-targets -- -D warnings` are green, with no unused-readme or redundant-homepage warning ([#85](https://github.com/jose-compu/rustmaninoff/issues/85)).
-- [ ] `./scripts/bench.sh` still runs on the synthetic corpus and appends a 1.0 row to `benchmarks/history.json`.
+- [ ] The CI benchmark ([#89](https://github.com/jose-compu/rustmaninoff/issues/89)) runs on the 1.0 commit. No scenario is more than 15% slower than the `main` baseline from the same runner unless that pull request explains the regression and changes the threshold in the same change. A result more than 5% slower is visible as a warning. `./scripts/bench.sh` still runs on the synthetic corpus.
 - [ ] ACTION.md and `release.yml` list the same OS/arch pairs. Each listed pair has a release archive. Pairs the Action refuses are named in ACTION.md.
 - [ ] Latest minor and the 1.0 tag itself are the only versions `SECURITY.md` promises to fix.
 
@@ -364,7 +369,7 @@ Any of these can ship on a day when the next milestone box is a one-check port t
 - [ ] `CKV_K8S_95`: match Checkov's duration grammar, or narrow the fidelity note if the approximation is the intended behavior. One patch.
 - [ ] Each Checkov-compare disagreement: fix the check, or add one row to the divergence table. One disagreement per patch.
 - [ ] False positives reported against a published CKV id: one id per patch, with a fixture that used to fail and now passes.
-- [ ] Speed: if a release's synthetic-corpus stage time exceeds the CI budget from 0.17, the next patch brings it back under the budget. Until that job exists, compare against the last `benchmarks/history.json` row before merging a parser change.
+- [ ] Speed: a CI benchmark failure (median more than 15% slower, [#89](https://github.com/jose-compu/rustmaninoff/issues/89)) is fixed in the next patch, or that same patch explains the regression and updates the threshold. Do not merge an unexplained fail.
 - [ ] Confirm the GitHub Marketplace listing still resolves for `jose-compu/rustmaninoff` and close [#33](https://github.com/jose-compu/rustmaninoff/issues/33) if the page is the current Action. The README already links it.
 - [ ] Launch notes ([#34](https://github.com/jose-compu/rustmaninoff/issues/34) and children [#35](https://github.com/jose-compu/rustmaninoff/issues/35)–[#39](https://github.com/jose-compu/rustmaninoff/issues/39), [#44](https://github.com/jose-compu/rustmaninoff/issues/44)–[#46](https://github.com/jose-compu/rustmaninoff/issues/46)) are writing and outreach. They are not version bumps. Do not cut a release only to post them.
 
