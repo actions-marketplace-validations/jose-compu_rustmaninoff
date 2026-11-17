@@ -147,6 +147,13 @@ fn eval_graph_resource(
     })
 }
 
+fn policy_frameworks_for(framework: Framework) -> Vec<Framework> {
+    match framework {
+        Framework::TerraformPlan => vec![Framework::TerraformPlan, Framework::Terraform],
+        other => vec![other],
+    }
+}
+
 fn visit_policies(
     resource: &Resource,
     index: &PolicyIndex<'_>,
@@ -178,16 +185,19 @@ fn visit_policies(
         let status = eval(policy);
         findings.push(make_finding(policy, status, &shared, resource, None));
     };
-    if let Some(by_type) = index.exact.get(&resource.framework) {
-        if let Some(list) = by_type.get(resource.resource_type.as_str()) {
+    let policy_frameworks = policy_frameworks_for(resource.framework);
+    for framework in policy_frameworks {
+        if let Some(by_type) = index.exact.get(&framework) {
+            if let Some(list) = by_type.get(resource.resource_type.as_str()) {
+                for policy in list {
+                    visit(policy);
+                }
+            }
+        }
+        if let Some(list) = index.wild.get(&framework) {
             for policy in list {
                 visit(policy);
             }
-        }
-    }
-    if let Some(list) = index.wild.get(&resource.framework) {
-        for policy in list {
-            visit(policy);
         }
     }
     if let Some(list) = index.unscoped_exact.get(resource.resource_type.as_str()) {
@@ -256,6 +266,8 @@ fn collapse(findings: Vec<Finding>) -> Vec<Finding> {
 
 #[cfg(test)]
 mod coverage;
+#[cfg(test)]
+mod plan_policy_tests;
 
 #[cfg(test)]
 mod tests {

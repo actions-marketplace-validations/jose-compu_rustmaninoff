@@ -8,7 +8,16 @@ fn framework_aliases_and_display() {
     assert_eq!(Framework::parse("dockerfile"), Some(Framework::Docker));
     assert_eq!(Framework::parse("docker"), Some(Framework::Docker));
     assert!(Framework::parse("helm").is_none());
+    assert_eq!(
+        Framework::parse("terraform_plan"),
+        Some(Framework::TerraformPlan)
+    );
+    assert_eq!(
+        Framework::parse("terraform-plan"),
+        Some(Framework::TerraformPlan)
+    );
     assert_eq!(Framework::Terraform.to_string(), "terraform");
+    assert_eq!(Framework::TerraformPlan.to_string(), "terraform_plan");
     assert_eq!(Framework::CloudFormation.to_string(), "cloudformation");
     assert_eq!(Framework::Kubernetes.to_string(), "kubernetes");
     assert_eq!(Framework::Docker.to_string(), "docker");

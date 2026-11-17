@@ -1,6 +1,6 @@
 # Rustmaninoff roadmap
 
-**Now:** v0.4.4 — Marketplace docs refresh; Action hardened in 0.4.1 (injection + checksum) ahead of Marketplace. Next: v0.5 pipeline inputs (Helm + plan JSON).
+**Now:** v0.5.0 shipped Terraform plan JSON (opt-in `terraform_plan`); next in v0.5 is Helm chart rendering ([#3](https://github.com/jose-compu/rustmaninoff/issues/3)).
 
 **Position:** complementary — *run it next to Trivy, in place of Checkov*. Teams already use Trivy for CVEs. Rustmaninoff’s claim is narrow and provable: **Checkov-compatible CKV policies, single Rust binary, fast**. Broad “scanner platform” scope dilutes that. Do not take on CVE / image layer / vuln-DB work.
 
@@ -43,7 +43,7 @@ Launch hygiene (hours, not weeks). README **and** the project site should match.
 | Local modules / count / for_each | [#17](https://github.com/jose-compu/rustmaninoff/issues/17) | open (feeds plan fidelity) |
 | Graph bridge from resolved interpolations | [#19](https://github.com/jose-compu/rustmaninoff/issues/19) | open |
 
-Parent epic [#2](https://github.com/jose-compu/rustmaninoff/issues/2): vars shipped; modules remain; **plan JSON moves to v0.5** with Helm (pipeline scan path).
+Parent epic [#2](https://github.com/jose-compu/rustmaninoff/issues/2): vars shipped; **plan JSON shipped in 0.5.0** ([#18](https://github.com/jose-compu/rustmaninoff/issues/18)); modules remain; Helm is the rest of v0.5.
 
 ## v0.4 — coverage credibility (shipped in 0.4.0)
 
@@ -90,7 +90,7 @@ Lead with: *next to Trivy, in place of Checkov* — speed + CKV compatibility. H
 | Epic / work | Issue |
 | --- | ---: |
 | Helm chart rendering → Kubernetes IR | [#3](https://github.com/jose-compu/rustmaninoff/issues/3) (Helm first; Kustomize secondary) |
-| `terraform_plan` JSON | [#18](https://github.com/jose-compu/rustmaninoff/issues/18) |
+| `terraform_plan` JSON | shipped **0.5.0** ([#18](https://github.com/jose-compu/rustmaninoff/issues/18)) |
 | Local modules / count / for_each (needed for faithful plan/module scans) | [#17](https://github.com/jose-compu/rustmaninoff/issues/17) |
 
 Checkov and Trivy both template Helm and scan plan/rendered surfaces. This release makes Rustmaninoff usable on those CI artifacts without widening into other product lines.
@@ -138,7 +138,7 @@ Only after coverage, pipeline inputs, and adoption are solid.
 | TF / CFN / K8s / Dockerfile attributes | yes | misconfig | **v0.2+**; deepen in **v0.4** |
 | Graph / `CKV2_*` | yes | some | **v0.3** ([#1](https://github.com/jose-compu/rustmaninoff/issues/1)) |
 | Coverage % / fidelity table | — | — | **v0.4** ([#42](https://github.com/jose-compu/rustmaninoff/issues/42)) |
-| Terraform plan / modules | yes | misconfig | modules [#17](https://github.com/jose-compu/rustmaninoff/issues/17); plan **v0.5** [#18](https://github.com/jose-compu/rustmaninoff/issues/18) |
+| Terraform plan / modules | yes | misconfig | plan shipped **0.5.0** [#18](https://github.com/jose-compu/rustmaninoff/issues/18); modules [#17](https://github.com/jose-compu/rustmaninoff/issues/17) |
 | Helm (then Kustomize) | yes | yes | **v0.5** [#3](https://github.com/jose-compu/rustmaninoff/issues/3) |
 | Action / pre-commit / brew / Docker / baseline | yes | yes | **v0.6** [#28](https://github.com/jose-compu/rustmaninoff/issues/28), [#58](https://github.com/jose-compu/rustmaninoff/issues/58) |
 | Secrets in IaC (narrow patterns) | yes | yes | **Later** [#7](https://github.com/jose-compu/rustmaninoff/issues/7) |

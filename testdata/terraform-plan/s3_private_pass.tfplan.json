@@ -1,0 +1,20 @@
+{
+  "format_version": "1.2",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "aws_s3_bucket.good",
+          "mode": "managed",
+          "type": "aws_s3_bucket",
+          "name": "good",
+          "values": {
+            "bucket": "data",
+            "acl": "private"
+          }
+        }
+      ]
+    }
+  },
+  "resource_changes": []
+}

@@ -44,7 +44,7 @@ pub enum Command {
 pub struct ScanArgs {
     /// Directory or file to scan. Defaults to the current directory.
     pub path: Option<PathBuf>,
-    /// Comma-separated frameworks: terraform,cloudformation,kubernetes,docker.
+    /// Comma-separated frameworks: terraform,terraform_plan,cloudformation,kubernetes,docker.
     #[arg(long)]
     pub framework: Option<String>,
     /// Comma-separated check ids to run.
@@ -392,6 +392,7 @@ fn classify_and_parse(
         Framework::Terraform => {
             rustmaninoff_parser_terraform::parse_file_with_context(path, &source, tf_ctx)
         }
+        Framework::TerraformPlan => rustmaninoff_parser_terraform::parse_plan(path, &source),
         Framework::CloudFormation => rustmaninoff_parser_cfn::parse_file(path, &source),
         Framework::Kubernetes => rustmaninoff_parser_k8s::parse_file(path, &source),
         Framework::Docker => rustmaninoff_parser_docker::parse_file(path, &source),
@@ -432,6 +433,11 @@ fn detect(path: &Path, source: &str) -> Option<Framework> {
         || trimmed.contains("apiVersion:")
     {
         return Some(Framework::Kubernetes);
+    }
+    if name.ends_with(".tfplan.json")
+        || (name.ends_with(".json") && rustmaninoff_parser_terraform::looks_like_plan(source))
+    {
+        return Some(Framework::TerraformPlan);
     }
     if name.ends_with(".json") && trimmed.contains("\"resource\"") {
         return Some(Framework::Terraform);
@@ -564,5 +570,7 @@ fn write_output(text: &str, path: Option<&Path>) -> anyhow::Result<()> {
 mod coverage;
 #[cfg(test)]
 mod pack_tests;
+#[cfg(test)]
+mod plan_tests;
 #[cfg(test)]
 mod safety_tests;
