@@ -56,7 +56,7 @@ _None._
 | TF AWS IAM cloudsplaining (`CKV_AWS_287–290`, `45`, …) | Deferred: needs policy-document semantic analysis beyond attribute DSL. |
 | Unknown interpolations | rustmaninoff never fails the process on `Unknown`; Checkov may guess or fail differently. |
 | Graph (`CKV2_*`) | Attribute-style + first-wave connection checks; not full Checkov graph pack. |
-| Helm / plan JSON / secrets / CVE | Intentional product gaps (see ROADMAP). |
+| Helm / secrets / CVE | Intentional product gaps (see ROADMAP). Terraform plan JSON shipped **0.5.0** (opt-in `terraform_plan`); catalog counts unchanged (536 checks, Docker 100%, Kubernetes 93.8%, Terraform AWS 36.2%). |
 
 ## Refresh
 ## Refresh

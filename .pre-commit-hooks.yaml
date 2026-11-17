@@ -1,7 +1,7 @@
 # Register with:
 #   repos:
 #     - repo: https://github.com/jose-compu/rustmaninoff
-#       rev: v0.3.0
+#       rev: v0.5.0
 #       hooks:
 #         - id: rustmaninoff
 #

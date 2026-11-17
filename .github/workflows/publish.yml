@@ -1,0 +1,42 @@
+name: publish-crates
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  crates-io:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Publish workspace crates in dependency order
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          crates=(
+            rustmaninoff-ir
+            rustmaninoff-engine
+            rustmaninoff-parser-terraform
+            rustmaninoff-parser-cfn
+            rustmaninoff-parser-k8s
+            rustmaninoff-parser-docker
+            rustmaninoff-report
+            rustmaninoff
+          )
+          for crate in "${crates[@]}"; do
+            if curl -fsS -o /dev/null "https://crates.io/api/v1/crates/${crate}/${version}"; then
+              echo "Skipping ${crate} ${version}: already on crates.io"
+            else
+              echo "Publishing ${crate} ${version}"
+              cargo publish -p "${crate}" --locked
+              echo "Waiting for crates.io index ..."
+              sleep 45
+            fi
+          done

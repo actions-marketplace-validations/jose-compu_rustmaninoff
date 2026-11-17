@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "lowercase")]
 pub enum Framework {
     Terraform,
+    #[serde(rename = "terraform_plan")]
+    TerraformPlan,
     CloudFormation,
     Kubernetes,
     Docker,
@@ -19,6 +21,7 @@ impl Framework {
     pub fn parse(text: &str) -> Option<Self> {
         match text.trim().to_ascii_lowercase().as_str() {
             "terraform" | "tf" => Some(Self::Terraform),
+            "terraform_plan" | "terraform-plan" | "terraformplan" => Some(Self::TerraformPlan),
             "cloudformation" | "cfn" => Some(Self::CloudFormation),
             "kubernetes" | "k8s" => Some(Self::Kubernetes),
             "docker" | "dockerfile" => Some(Self::Docker),
@@ -29,6 +32,7 @@ impl Framework {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Terraform => "terraform",
+            Self::TerraformPlan => "terraform_plan",
             Self::CloudFormation => "cloudformation",
             Self::Kubernetes => "kubernetes",
             Self::Docker => "docker",

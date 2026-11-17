@@ -1,6 +1,9 @@
 //! Parse Terraform `.tf` and `.tf.json` into resources.
 
 mod eval;
+mod plan;
+
+pub use plan::{looks_like_plan, parse_plan};
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
@@ -971,3 +974,5 @@ resource "aws_s3_bucket" "logs" {
 
 #[cfg(test)]
 mod coverage;
+#[cfg(test)]
+mod plan_coverage;
