@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.1 — 2026-11-17
+
+### Added
+
+- Terraform plan scanning redacts attributes Terraform marks sensitive (`sensitive_values`, `before_sensitive`, and `after_sensitive` in `resource_changes`, and `sensitive_values` on planned resources). Redacted values become the fixed placeholder `(sensitive value)` in the scan IR before checks run, so they cannot surface in CLI, JSON, SARIF, or JUnit output.
+
+### Changed
+
+- Workspace crates and the Action default `version` pin are 0.5.1.
+
+### Notes
+
+- This is not a secrets scanner: only provider-schema–marked sensitive values are redacted. Keep plan artifacts out of logs and CI output; unmarked values remain your pipeline’s responsibility.
+
 ## 0.5.0 — 2026-11-17
 
 ### Added

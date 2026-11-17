@@ -1,0 +1,39 @@
+{
+  "format_version": "1.2",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "aws_s3_bucket.bad",
+          "mode": "managed",
+          "type": "aws_s3_bucket",
+          "name": "bad",
+          "values": {
+            "acl": "public-read",
+            "tags": {
+              "api_key": "SENSITIVE_CANARY_LEGACY_1"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "resource_changes": [
+    {
+      "address": "aws_s3_bucket.bad",
+      "change": {
+        "after": {
+          "acl": "public-read",
+          "tags": {
+            "api_key": "SENSITIVE_CANARY_LEGACY_1"
+          }
+        },
+        "sensitive_values": {
+          "tags": {
+            "api_key": true
+          }
+        }
+      }
+    }
+  ]
+}

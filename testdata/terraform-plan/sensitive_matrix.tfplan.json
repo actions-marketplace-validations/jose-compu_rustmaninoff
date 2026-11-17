@@ -1,0 +1,203 @@
+{
+  "format_version": "1.2",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "aws_s3_bucket.root",
+          "mode": "managed",
+          "type": "aws_s3_bucket",
+          "name": "root",
+          "values": {
+            "acl": "public-read",
+            "bucket": "PLAIN_VISIBLE_BUCKET",
+            "tags": {
+              "plain": "PLAIN_VISIBLE_TAG",
+              "secret_top": "SENSITIVE_CANARY_0_FAIL_PATH"
+            }
+          },
+          "sensitive_values": {
+            "tags": {
+              "secret_top": true
+            }
+          }
+        },
+        {
+          "address": "aws_ssm_parameter.token",
+          "mode": "managed",
+          "type": "aws_ssm_parameter",
+          "name": "token",
+          "values": {
+            "type": "String",
+            "value": "SENSITIVE_CANARY_1_TOP_LEVEL"
+          }
+        },
+        {
+          "address": "aws_s3_bucket.nested",
+          "mode": "managed",
+          "type": "aws_s3_bucket",
+          "name": "nested",
+          "values": {
+            "acl": "private",
+            "tags": {
+              "secret_nested": "SENSITIVE_CANARY_2_NESTED_MAP"
+            },
+            "cors_rule": [
+              {
+                "allowed_headers": ["SENSITIVE_CANARY_3_LIST_OBJ_A"],
+                "expose_headers": ["SENSITIVE_CANARY_4_LIST_OBJ_B"]
+              }
+            ],
+            "server_side_encryption_configuration": {
+              "rule": {
+                "apply_server_side_encryption_by_default": {
+                  "kms_master_key_id": "SENSITIVE_CANARY_5_DEEP_BLOCK"
+                }
+              }
+            }
+          }
+        },
+        {
+          "address": "aws_ssm_parameter.legacy",
+          "mode": "managed",
+          "type": "aws_ssm_parameter",
+          "name": "legacy",
+          "values": {
+            "value": "SENSITIVE_CANARY_9_PRIOR_STATE"
+          }
+        },
+        {
+          "address": "aws_s3_bucket.items[\"alpha\"]",
+          "mode": "managed",
+          "type": "aws_s3_bucket",
+          "name": "items",
+          "index": "alpha",
+          "values": {
+            "acl": "private",
+            "bucket": "SENSITIVE_CANARY_6_FOREACH_ADDR"
+          }
+        }
+      ],
+      "child_modules": [
+        {
+          "address": "module.child",
+          "resources": [
+            {
+              "address": "module.child.aws_s3_bucket.logs",
+              "mode": "managed",
+              "type": "aws_s3_bucket",
+              "name": "logs",
+              "values": {
+                "acl": "private",
+                "tags": {
+                  "child_secret": "SENSITIVE_CANARY_7_CHILD_MODULE"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "address": "db_password",
+          "sensitive": true,
+          "type": "string",
+          "value": "SENSITIVE_CANARY_8_OUTPUT_VALUE",
+          "sensitive_values": true
+        }
+      ]
+    }
+  },
+  "prior_state": {
+    "format_version": "1.0",
+    "terraform_version": "1.6.0",
+    "values": {
+      "root_module": {
+        "resources": [
+          {
+            "address": "aws_ssm_parameter.legacy",
+            "mode": "managed",
+            "type": "aws_ssm_parameter",
+            "name": "legacy",
+            "values": {
+              "value": "SENSITIVE_CANARY_9_PRIOR_STATE_ONLY"
+            },
+            "sensitive_values": {
+              "value": true
+            }
+          }
+        ]
+      }
+    }
+  },
+  "resource_changes": [
+    {
+      "address": "aws_s3_bucket.root",
+      "change": {
+        "actions": ["update"],
+        "before": { "acl": "private" },
+        "after": { "acl": "public-read", "bucket": "PLAIN_VISIBLE_BUCKET" },
+        "after_unknown": {},
+        "before_sensitive": { "tags": { "secret_top": true } },
+        "after_sensitive": { "tags": { "secret_top": true } },
+        "sensitive_values": { "tags": { "secret_top": true } }
+      }
+    },
+    {
+      "address": "aws_ssm_parameter.token",
+      "change": {
+        "actions": ["create"],
+        "after": { "type": "String", "value": "SENSITIVE_CANARY_1_TOP_LEVEL" },
+        "after_sensitive": { "value": true },
+        "sensitive_values": { "value": true }
+      }
+    },
+    {
+      "address": "aws_s3_bucket.nested",
+      "change": {
+        "actions": ["update"],
+        "after_unknown": { "cors_rule": [{ "allowed_headers": [false] }] },
+        "sensitive_values": {
+          "tags": { "secret_nested": true },
+          "cors_rule": [{ "allowed_headers": [true], "expose_headers": [true] }],
+          "server_side_encryption_configuration": true
+        }
+      }
+    },
+    {
+      "address": "aws_s3_bucket.items[\"alpha\"]",
+      "change": {
+        "actions": ["create"],
+        "after": { "acl": "private", "bucket": "SENSITIVE_CANARY_6_FOREACH_ADDR" },
+        "sensitive_values": { "bucket": true }
+      }
+    },
+    {
+      "address": "module.child.aws_s3_bucket.logs",
+      "change": {
+        "actions": ["create"],
+        "sensitive_values": { "tags": { "child_secret": true } }
+      }
+    },
+    {
+      "address": "aws_ssm_parameter.legacy",
+      "change": {
+        "actions": ["update"],
+        "before_sensitive": { "value": true },
+        "after_sensitive": { "value": true },
+        "sensitive_values": { "value": true }
+      }
+    }
+  ],
+  "output_changes": [
+    {
+      "address": "db_password",
+      "change": {
+        "actions": ["create"],
+        "after": "SENSITIVE_CANARY_8_OUTPUT_VALUE",
+        "after_sensitive": true,
+        "sensitive_values": true
+      }
+    }
+  ]
+}

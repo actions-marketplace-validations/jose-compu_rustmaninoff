@@ -8,6 +8,9 @@ use rustmaninoff_ir::{
     ResourceKind, ResourceRef, Value,
 };
 
+/// Stable placeholder for Terraform-marked sensitive plan attributes.
+pub const SENSITIVE_PLACEHOLDER: &str = "(sensitive value)";
+
 pub fn parse_plan(path: &Path, source: &str) -> ParseOutput {
     let parsed: serde_json::Value = match serde_json::from_str(source) {
         Ok(value) => value,
@@ -38,9 +41,17 @@ pub fn parse_plan(path: &Path, source: &str) -> ParseOutput {
         };
     };
     let unknown_by_address = unknown_keys(&parsed);
+    let sensitive_by_address = sensitive_keys(&parsed);
     let skips = skips_between(&extract_skip_comments(source), 1, usize::MAX);
     let mut output = ParseOutput::default();
-    walk_module(path, root_module, &unknown_by_address, &skips, &mut output);
+    walk_module(
+        path,
+        root_module,
+        &unknown_by_address,
+        &sensitive_by_address,
+        &skips,
+        &mut output,
+    );
     output
 }
 
@@ -62,17 +73,143 @@ fn unknown_keys(plan: &serde_json::Value) -> HashMap<String, BTreeMap<String, bo
         else {
             continue;
         };
-        collect_unknown_flags(after_unknown, "", &mut map, address);
+        collect_marker_flags(after_unknown, "", &mut map, address);
     }
     map
 }
 
-fn collect_unknown_flags(
+fn sensitive_keys(plan: &serde_json::Value) -> HashMap<String, BTreeMap<String, bool>> {
+    let mut map = HashMap::new();
+    if let Some(changes) = plan
+        .get("resource_changes")
+        .and_then(|value| value.as_array())
+    {
+        for change in changes {
+            let Some(address) = change.get("address").and_then(|value| value.as_str()) else {
+                continue;
+            };
+            let Some(change_body) = change.get("change") else {
+                continue;
+            };
+            for key in ["sensitive_values", "before_sensitive", "after_sensitive"] {
+                if let Some(markers) = change_body.get(key) {
+                    collect_marker_flags(markers, "", &mut map, address);
+                }
+            }
+        }
+    }
+    collect_planned_sensitivity(plan, &mut map);
+    if let Some(root) = plan
+        .get("prior_state")
+        .and_then(|value| value.get("values"))
+        .and_then(|value| value.get("root_module"))
+    {
+        walk_planned_sensitivity(root, &mut map);
+    }
+    collect_output_change_sensitivity(plan, &mut map);
+    map
+}
+
+/// Output values are not modeled as resources; sensitivity markers still apply if
+/// outputs are ever attached to the IR later. Today they only contribute masks
+/// for addresses that also appear as planned resources (defense in depth).
+fn collect_output_change_sensitivity(
+    plan: &serde_json::Value,
+    out: &mut HashMap<String, BTreeMap<String, bool>>,
+) {
+    let Some(changes) = plan
+        .get("output_changes")
+        .and_then(|value| value.as_array())
+    else {
+        return;
+    };
+    for change in changes {
+        let Some(address) = change.get("address").and_then(|value| value.as_str()) else {
+            continue;
+        };
+        let key = format!("output.{address}");
+        let Some(change_body) = change.get("change") else {
+            continue;
+        };
+        for marker_key in ["sensitive_values", "before_sensitive", "after_sensitive"] {
+            if let Some(markers) = change_body.get(marker_key) {
+                collect_marker_flags(markers, "", out, &key);
+            }
+        }
+    }
+    if let Some(outputs) = plan
+        .get("planned_values")
+        .and_then(|value| value.get("outputs"))
+        .and_then(|value| value.as_array())
+    {
+        for entry in outputs {
+            let (Some(address), Some(markers)) = (
+                entry.get("address").and_then(|value| value.as_str()),
+                entry.get("sensitive_values"),
+            ) else {
+                continue;
+            };
+            let key = format!("output.{address}");
+            collect_marker_flags(markers, "", out, &key);
+            if entry.get("sensitive").and_then(|v| v.as_bool()) == Some(true) {
+                out.entry(key).or_default().insert(String::new(), true);
+            }
+        }
+    }
+}
+
+fn collect_planned_sensitivity(
+    plan: &serde_json::Value,
+    out: &mut HashMap<String, BTreeMap<String, bool>>,
+) {
+    let Some(root) = plan
+        .get("planned_values")
+        .and_then(|value| value.get("root_module"))
+    else {
+        return;
+    };
+    walk_planned_sensitivity(root, out);
+}
+
+fn walk_planned_sensitivity(
+    module: &serde_json::Value,
+    out: &mut HashMap<String, BTreeMap<String, bool>>,
+) {
+    if let Some(resources) = module.get("resources").and_then(|value| value.as_array()) {
+        for entry in resources {
+            let (Some(address), Some(markers)) = (
+                entry.get("address").and_then(|value| value.as_str()),
+                entry.get("sensitive_values"),
+            ) else {
+                continue;
+            };
+            collect_marker_flags(markers, "", out, address);
+        }
+    }
+    if let Some(children) = module
+        .get("child_modules")
+        .and_then(|value| value.as_array())
+    {
+        for child in children {
+            walk_planned_sensitivity(child, out);
+        }
+    }
+}
+
+fn collect_marker_flags(
     value: &serde_json::Value,
     prefix: &str,
     out: &mut HashMap<String, BTreeMap<String, bool>>,
     address: &str,
 ) {
+    if value.as_bool() == Some(true) {
+        if !prefix.is_empty() {
+            out.entry(address.to_owned())
+                .or_default()
+                .insert(prefix.to_string(), true);
+        }
+        return;
+    }
     match value {
         serde_json::Value::Object(map) => {
             for (key, child) in map {
@@ -82,18 +219,18 @@ fn collect_unknown_flags(
                     format!("{prefix}.{key}")
                 };
                 if child.as_bool() == Some(true) {
-                    out.entry(address.to_string())
+                    out.entry(address.to_owned())
                         .or_default()
-                        .insert(path, true);
+                        .insert(path.clone(), true);
                 } else {
-                    collect_unknown_flags(child, &path, out, address);
+                    collect_marker_flags(child, &path, out, address);
                 }
             }
         }
         serde_json::Value::Array(items) => {
             for (index, child) in items.iter().enumerate() {
                 let path = format!("{prefix}[{index}]");
-                collect_unknown_flags(child, &path, out, address);
+                collect_marker_flags(child, &path, out, address);
             }
         }
         _ => {}
@@ -104,12 +241,20 @@ fn walk_module(
     path: &Path,
     module: &serde_json::Value,
     unknown_by_address: &HashMap<String, BTreeMap<String, bool>>,
+    sensitive_by_address: &HashMap<String, BTreeMap<String, bool>>,
     skips: &[rustmaninoff_ir::Skip],
     output: &mut ParseOutput,
 ) {
     if let Some(resources) = module.get("resources").and_then(|value| value.as_array()) {
         for entry in resources {
-            emit_resource(path, entry, unknown_by_address, skips, output);
+            emit_resource(
+                path,
+                entry,
+                unknown_by_address,
+                sensitive_by_address,
+                skips,
+                output,
+            );
         }
     }
     if let Some(children) = module
@@ -117,7 +262,14 @@ fn walk_module(
         .and_then(|value| value.as_array())
     {
         for child in children {
-            walk_module(path, child, unknown_by_address, skips, output);
+            walk_module(
+                path,
+                child,
+                unknown_by_address,
+                sensitive_by_address,
+                skips,
+                output,
+            );
         }
     }
 }
@@ -126,6 +278,7 @@ fn emit_resource(
     path: &Path,
     entry: &serde_json::Value,
     unknown_by_address: &HashMap<String, BTreeMap<String, bool>>,
+    sensitive_by_address: &HashMap<String, BTreeMap<String, bool>>,
     skips: &[rustmaninoff_ir::Skip],
     output: &mut ParseOutput,
 ) {
@@ -158,6 +311,13 @@ fn emit_resource(
         for path in flags.keys() {
             if flags.get(path) == Some(&true) {
                 set_unknown_path(&mut attributes, path);
+            }
+        }
+    }
+    if let Some(flags) = sensitive_by_address.get(address) {
+        for path in flags.keys() {
+            if flags.get(path) == Some(&true) {
+                set_redacted_path(&mut attributes, path);
             }
         }
     }
@@ -196,6 +356,50 @@ fn json_to_value(value: &serde_json::Value) -> Value {
 fn set_unknown_path(value: &mut Value, path: &str) {
     let parts: Vec<&str> = path.split('.').collect();
     set_unknown_segments(value, &parts);
+}
+
+fn set_redacted_path(value: &mut Value, path: &str) {
+    let parts: Vec<&str> = path.split('.').collect();
+    set_redacted_segments(value, &parts);
+}
+
+fn set_redacted_segments(value: &mut Value, segments: &[&str]) {
+    if segments.is_empty() {
+        return;
+    }
+    let placeholder = Value::string(SENSITIVE_PLACEHOLDER);
+    let head = segments[0];
+    if let Some((key, rest)) = head.split_once('[') {
+        let index: usize = rest.trim_end_matches(']').parse().unwrap_or(0);
+        if let Value::Object(map) = value {
+            let entry = map
+                .entry(key.to_string())
+                .or_insert_with(|| Value::Array(Vec::new()));
+            if let Value::Array(items) = entry {
+                while items.len() <= index {
+                    items.push(Value::Null);
+                }
+                if segments.len() == 1 {
+                    items[index] = placeholder;
+                    return;
+                }
+                set_redacted_segments(&mut items[index], &segments[1..]);
+            }
+        }
+        return;
+    }
+    if segments.len() == 1 {
+        if let Value::Object(map) = value {
+            map.insert(head.to_string(), placeholder);
+        }
+        return;
+    }
+    if let Value::Object(map) = value {
+        let entry = map
+            .entry(head.to_string())
+            .or_insert_with(|| Value::Object(BTreeMap::new()));
+        set_redacted_segments(entry, &segments[1..]);
+    }
 }
 
 fn set_unknown_segments(value: &mut Value, segments: &[&str]) {
@@ -269,6 +473,13 @@ fn resource_ref_from_address(address: &str) -> Option<ResourceRef> {
         parts[parts.len() - 2],
         parts[parts.len() - 1],
     ))
+}
+
+#[cfg(test)]
+pub(crate) fn sensitive_paths_for_test(
+    plan: &serde_json::Value,
+) -> HashMap<String, BTreeMap<String, bool>> {
+    sensitive_keys(plan)
 }
 
 pub fn looks_like_plan(source: &str) -> bool {

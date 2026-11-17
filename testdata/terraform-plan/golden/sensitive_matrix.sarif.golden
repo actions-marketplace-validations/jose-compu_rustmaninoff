@@ -1,0 +1,51 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "results": [
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "testdata/terraform-plan/sensitive_matrix.tfplan.json"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Ensure the S3 bucket does not allow READ permissions to everyone aws_s3_bucket.root"
+          },
+          "ruleId": "CKV_AWS_20"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "informationUri": "https://github.com/rustmaninoff/rustmaninoff",
+          "name": "rustmaninoff",
+          "rules": [
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "Ensure the S3 bucket does not allow READ permissions to everyone"
+              },
+              "helpUri": "Adapted from Checkov CKV_AWS_20. https://github.com/bridgecrewio/checkov",
+              "id": "CKV_AWS_20",
+              "shortDescription": {
+                "text": "Ensure the S3 bucket does not allow READ permissions to everyone"
+              }
+            }
+          ],
+          "version": "0.5.1"
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}

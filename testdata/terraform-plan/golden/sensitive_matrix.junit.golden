@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="rustmaninoff" tests="4" failures="1">
+  <testcase classname="testdata/terraform-plan/sensitive_matrix.tfplan.json" name="CKV_AWS_20 aws_s3_bucket.items">
+  </testcase>
+  <testcase classname="testdata/terraform-plan/sensitive_matrix.tfplan.json" name="CKV_AWS_20 aws_s3_bucket.module.child.logs">
+  </testcase>
+  <testcase classname="testdata/terraform-plan/sensitive_matrix.tfplan.json" name="CKV_AWS_20 aws_s3_bucket.nested">
+  </testcase>
+  <testcase classname="testdata/terraform-plan/sensitive_matrix.tfplan.json" name="CKV_AWS_20 aws_s3_bucket.root">
+    <failure message="Ensure the S3 bucket does not allow READ permissions to everyone (HIGH)"/>
+  </testcase>
+</testsuite>

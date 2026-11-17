@@ -4,7 +4,11 @@ use std::path::Path;
 use rustmaninoff_engine::Status;
 use rustmaninoff_ir::Framework;
 
+use rustmaninoff_report::{render_json, render_junit, render_sarif, render_text, RenderOptions};
+
 use crate::{scan, ScanRequest, Severity};
+
+const SECRET_MARKER: &str = "SENSITIVE_CANARY_LEGACY_1";
 
 fn fixture_root() -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata/terraform-plan")
@@ -145,4 +149,44 @@ fn default_scan_ignores_plan_file() {
         .iter()
         .all(|f| f.check_id.as_ref() != "CKV_AWS_20"));
     let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
+fn sensitive_plan_values_never_appear_in_report_outputs() {
+    let root = fixture_root();
+    let request = ScanRequest {
+        path: root.join("s3_nested_sensitive_fail.tfplan.json"),
+        frameworks: vec![Framework::TerraformPlan],
+        checks: vec!["CKV_AWS_20".into()],
+        skip_checks: Vec::new(),
+        fail_on: Severity::High,
+        external_dirs: Vec::new(),
+        var_files: Vec::new(),
+        show_unknown: true,
+        show_passed: true,
+        compact: false,
+        soft_fail: false,
+        outputs: vec!["cli".into(), "json".into(), "sarif".into(), "junit".into()],
+        json_file: None,
+        sarif_file: None,
+        junit_file: None,
+        excluded: vec![".git".into()],
+    };
+    let result = scan(&request).expect("scan sensitive plan");
+    assert_eq!(result.exit_code, 1);
+    let options = RenderOptions {
+        show_passed: true,
+        show_unknown: true,
+        compact: false,
+    };
+    let cli = render_text(&result.findings, &result.diagnostics, &options);
+    let json = render_json(&result.findings, &result.diagnostics);
+    let sarif = render_sarif(&result.findings);
+    let junit = render_junit(&result.findings, &result.diagnostics);
+    for blob in [&cli, &json, &sarif, &junit] {
+        assert!(
+            !blob.contains(SECRET_MARKER),
+            "secret leaked into report output"
+        );
+    }
 }
