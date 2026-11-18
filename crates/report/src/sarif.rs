@@ -28,15 +28,20 @@ pub fn render_sarif(findings: &[Finding], options: &SarifOptions<'_>) -> String 
             continue;
         }
         seen.push(finding.check_id.clone());
-        let info_uri = rule_information_uri(finding.guidelines.as_deref());
-        rules.push(serde_json::json!({
+        let help_uri = rule_information_uri(finding.guidelines.as_deref());
+        let mut rule = serde_json::json!({
             "id": finding.check_id.as_ref(),
             "shortDescription": {"text": finding.check_name.as_ref()},
             "fullDescription": {"text": finding.check_name.as_ref()},
             "defaultConfiguration": {"level": sarif_level(finding.severity)},
-            "helpUri": finding.guidelines.as_deref().unwrap_or(""),
-            "informationUri": info_uri,
-        }));
+            "helpUri": help_uri,
+        });
+        if let Some(guidelines) = finding.guidelines.as_deref() {
+            if !guidelines.is_empty() {
+                rule["help"] = serde_json::json!({"text": guidelines});
+            }
+        }
+        rules.push(rule);
     }
     let results = failed
         .iter()
@@ -294,7 +299,7 @@ mod tests {
         );
         assert!(sarif.contains("\"uriBaseId\": \"%SRCROOT%\""));
         assert!(sarif.contains("\"originalUriBaseIds\""));
-        assert!(sarif.contains("\"informationUri\": \"https://github.com/bridgecrewio/checkov\""));
+        assert!(sarif.contains("\"helpUri\": \"https://github.com/bridgecrewio/checkov\""));
         assert!(sarif.contains("\"message\": {\n            \"text\": \"Test check\"\n          }"));
         assert!(!sarif.contains("Test check aws_s3_bucket"));
     }

@@ -44,9 +44,11 @@
               "fullDescription": {
                 "text": "Ensure the S3 bucket does not allow READ permissions to everyone"
               },
-              "helpUri": "Adapted from Checkov CKV_AWS_20. https://github.com/bridgecrewio/checkov",
+              "help": {
+                "text": "Adapted from Checkov CKV_AWS_20. https://github.com/bridgecrewio/checkov"
+              },
+              "helpUri": "https://github.com/bridgecrewio/checkov",
               "id": "CKV_AWS_20",
-              "informationUri": "https://github.com/bridgecrewio/checkov",
               "shortDescription": {
                 "text": "Ensure the S3 bucket does not allow READ permissions to everyone"
               }
