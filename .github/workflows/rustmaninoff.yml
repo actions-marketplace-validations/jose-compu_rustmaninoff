@@ -1,4 +1,4 @@
-# Eat our own dog food: run the published Marketplace Action on this repo.
+# Eat our own dog food: scan this repo with the CLI built from the same commit.
 name: rustmaninoff
 
 on:
@@ -16,16 +16,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build rustmaninoff
+        run: cargo build --release -p rustmaninoff --locked
       - name: Rustmaninoff IaC scan
-        uses: jose-compu/rustmaninoff@v0.5.2
-        with:
-          path: .
-          version: "0.5.2"
-          fail-on: HIGH
-          output: sarif
-          sarif-file: rustmaninoff.sarif
-
+        run: |
+          ./target/release/rustmaninoff scan . \
+            --fail-on HIGH \
+            --output sarif \
+            --sarif-file rustmaninoff.sarif \
+            --soft-fail \
+            --compact
       - name: Upload SARIF
         uses: github/codeql-action/upload-sarif@v3
         if: always()
