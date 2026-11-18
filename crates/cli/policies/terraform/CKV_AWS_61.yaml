@@ -1,0 +1,47 @@
+metadata:
+  id: CKV_AWS_61
+  name: Ensure AWS IAM policy does not allow assume role permission across all services
+  category: IAM
+  severity: HIGH
+  framework: terraform
+  guidelines: Adapted from Checkov CKV_AWS_61. https://github.com/bridgecrewio/checkov
+resource_types:
+- aws_iam_role
+definition:
+  cond_type: no_element
+  attribute: assume_role_policy.Statement
+  where:
+    and:
+    - cond_type: attribute
+      attribute: Effect
+      operator: not_equals
+      value: Deny
+    - cond_type: attribute
+      attribute: Principal.AWS
+      operator: regex_match
+      value: ^(\d{12}|arn:aws:iam::\d{12}:root)$
+fixtures:
+  fail: |
+    resource "aws_iam_role" "bad" {
+      name               = "bad"
+      assume_role_policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [{
+          Effect    = "Allow"
+          Principal = { AWS = "arn:aws:iam::123456789012:root" }
+          Action    = "sts:AssumeRole"
+        }]
+      })
+    }
+  pass: |
+    resource "aws_iam_role" "good" {
+      name               = "good"
+      assume_role_policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [{
+          Effect    = "Allow"
+          Principal = { Service = "ec2.amazonaws.com" }
+          Action    = "sts:AssumeRole"
+        }]
+      })
+    }

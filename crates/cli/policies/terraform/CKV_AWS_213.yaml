@@ -1,0 +1,64 @@
+metadata:
+  id: CKV_AWS_213
+  name: Ensure ELB Policy uses only secure protocols
+  category: NETWORKING
+  severity: HIGH
+  framework: terraform
+  guidelines: Adapted from Checkov CKV_AWS_213. https://github.com/bridgecrewio/checkov
+resource_types:
+- aws_load_balancer_policy
+definition:
+  cond_type: no_element
+  attribute: policy_attribute
+  where:
+    or:
+    - and:
+      - cond_type: attribute
+        attribute: name
+        operator: within
+        value:
+        - Protocol-SSLv3
+        - Protocol-TLSv1
+        - Protocol-TLSv1.1
+      - cond_type: attribute
+        attribute: value
+        operator: is_true
+    - and:
+      - cond_type: attribute
+        attribute: name
+        operator: equals
+        value: Reference-Security-Policy
+      - cond_type: attribute
+        attribute: value
+        operator: within
+        value:
+        - ELBSecurityPolicy-2016-08
+        - ELBSecurityPolicy-TLS-1-1-2017-01
+        - ELBSecurityPolicy-2015-05
+        - ELBSecurityPolicy-2015-03
+        - ELBSecurityPolicy-2015-02
+        - ELBSecurityPolicy-TLS-1-0-2015-04
+        - ELBSecurityPolicy-2014-10
+        - ELBSecurityPolicy-Default
+        - ELBSecurityPolicy-2014-01
+fixtures:
+  fail: |
+    resource "aws_load_balancer_policy" "bad" {
+      load_balancer_name = "legacy"
+      policy_name        = "bad"
+      policy_type_name   = "SSLNegotiationPolicyType"
+      policy_attribute {
+        name  = "Protocol-TLSv1"
+        value = true
+      }
+    }
+  pass: |
+    resource "aws_load_balancer_policy" "good" {
+      load_balancer_name = "legacy"
+      policy_name        = "good"
+      policy_type_name   = "SSLNegotiationPolicyType"
+      policy_attribute {
+        name  = "Reference-Security-Policy"
+        value = "ELBSecurityPolicy-TLS-1-2-2017-01"
+      }
+    }

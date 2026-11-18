@@ -1,0 +1,53 @@
+metadata:
+  id: CKV_AWS_113
+  name: Ensure Session Manager logs are enabled and encrypted
+  category: LOGGING
+  severity: MEDIUM
+  framework: terraform
+  guidelines: Adapted from Checkov CKV_AWS_113. https://github.com/bridgecrewio/checkov
+resource_types:
+- aws_ssm_document
+definition:
+  or:
+  - cond_type: attribute
+    attribute: document_type
+    operator: not_equals
+    value: Session
+  - and:
+    - cond_type: attribute
+      attribute: content.inputs.s3BucketName
+      operator: exists
+      missing: fail
+    - cond_type: attribute
+      attribute: content.inputs.s3EncryptionEnabled
+      operator: is_true
+  - and:
+    - cond_type: attribute
+      attribute: content.inputs.cloudWatchLogGroupName
+      operator: exists
+      missing: fail
+    - cond_type: attribute
+      attribute: content.inputs.cloudWatchEncryptionEnabled
+      operator: is_true
+fixtures:
+  fail: |
+    resource "aws_ssm_document" "bad" {
+      name          = "bad"
+      document_type = "Session"
+      content = jsonencode({
+        schemaVersion = "1.0"
+        inputs        = {}
+      })
+    }
+  pass: |
+    resource "aws_ssm_document" "good" {
+      name          = "good"
+      document_type = "Session"
+      content = jsonencode({
+        schemaVersion = "1.0"
+        inputs = {
+          s3BucketName        = "session-logs"
+          s3EncryptionEnabled = true
+        }
+      })
+    }

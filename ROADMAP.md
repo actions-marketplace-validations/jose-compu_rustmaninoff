@@ -1,6 +1,6 @@
 # Rustmaninoff roadmap
 
-Current release: **0.5.1**. This file is the queue for daily releases. Tick a box in the same commit that ships the work.
+Current release: **0.5.2**. This file is the queue for daily releases. Tick a box in the same commit that ships the work.
 
 Position, unchanged: Checkov-compatible CKV policies, one Rust binary, fast. Run it next to Trivy. Trivy keeps CVEs, image layers, and SBOMs. Rustmaninoff does not grow a vulnerability database ([#8](https://github.com/jose-compu/rustmaninoff/issues/8) is closed as out of scope).
 
@@ -38,13 +38,15 @@ Do not re-schedule this work.
 | Resource graph, `cond_type: connection`, first-wave `CKV2_AWS_*` | 0.3.0 ([#1](https://github.com/jose-compu/rustmaninoff/issues/1)) |
 | Variables, locals, `TF_VAR_*`, `--var-file`, simple `${var.x}` / `${local.x}` | 0.3.0 ([#16](https://github.com/jose-compu/rustmaninoff/issues/16)) |
 | 536 built-in checks, each with a pass and a fail fixture (`crates/cli/src/pack_tests.rs`) | 0.4.0 |
+| CI benchmark regression gate + Docker/plan bench corpora | 0.5.2 ([#89](https://github.com/jose-compu/rustmaninoff/issues/89)) |
+| Terraform AWS `CKV_AWS_61`, `CKV_AWS_93`, `CKV_AWS_112`, `CKV_AWS_113`, `CKV_AWS_213` | 0.5.2 (toward 0.8.0) |
 | Benches (`benchmarks/`, `scripts/bench.sh`), fidelity table, Checkov-compare CI | 0.4.0 ([#41](https://github.com/jose-compu/rustmaninoff/issues/41), [#42](https://github.com/jose-compu/rustmaninoff/issues/42), [#43](https://github.com/jose-compu/rustmaninoff/issues/43)) |
 | GitHub Action, pre-commit hook, Homebrew tap `jose-compu/tap`, GHCR image, crates.io publish on `v*` | 0.4.x–0.5.0 ([#28](https://github.com/jose-compu/rustmaninoff/issues/28)) |
 | Release archives: `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `aarch64-apple-darwin`, `x86_64-apple-darwin` | `.github/workflows/release.yml` |
 | Opt-in `terraform_plan` on `terraform show -json` (planned values, child modules, data sources, `after_unknown` does not fail the process) | 0.5.0 ([#18](https://github.com/jose-compu/rustmaninoff/issues/18)) |
 | Terraform-marked sensitive plan values redacted to `(sensitive value)` before checks and reports | 0.5.1 |
 
-536 checks break down as Terraform 368, CloudFormation 51, Kubernetes 106, Docker 11. Families: `CKV_AWS` 399 (Terraform and CloudFormation files together), `CKV_K8S` 106, `CKV_DOCKER` 11, `CKV2_AWS` 20.
+541 checks break down as Terraform 373, CloudFormation 51, Kubernetes 106, Docker 11. Families: `CKV_AWS` 404 (Terraform and CloudFormation files together), `CKV_K8S` 106, `CKV_DOCKER` 11, `CKV2_AWS` 20.
 
 The pinned catalog is `tools/checkov-ids/snapshot.json`, scraped from `bridgecrewio/checkov` by `scripts/fetch_checkov_ids.py`. It has three buckets only: Dockerfile attribute checks, Kubernetes attribute checks, and every Terraform **resource** check (the file is named `terraform_aws`, the directory scraped is `checkov/terraform/checks/resource/`). Graph checks are not in the scrape. CloudFormation is not in the scrape.
 
@@ -52,8 +54,8 @@ The pinned catalog is `tools/checkov-ids/snapshot.json`, scraped from `bridgecre
 | --- | ---: | ---: | ---: |
 | Docker attribute | 11 | 11 | 100% |
 | Kubernetes attribute | 113 | 106 | 93.8% |
-| Whole Terraform resource directory | 928 | 336 | 36.2% |
-| `CKV_AWS_*` inside that directory | 361 | 336 | 93.1% (25 missing) |
+| Whole Terraform resource directory | 928 | 341 | 36.7% |
+| `CKV_AWS_*` inside that directory | 361 | 341 | 94.5% (20 missing) |
 | `CKV_AZURE_*` | 242 | 0 | none |
 | `CKV_GCP_*` | 123 | 0 | none |
 | Other clouds in the same directory | 202 | 0 | none (see below) |
@@ -62,7 +64,7 @@ The 36.2% row in [docs/fidelity.md](docs/fidelity.md) is labeled "terraform AWS 
 
 Kubernetes ids still missing: `CKV_K8S_32`, `CKV_K8S_105`, `CKV_K8S_147`, `CKV_K8S_151`, `CKV_K8S_152`, `CKV_K8S_153`, `CKV_K8S_154`.
 
-Terraform AWS resource ids still missing: `CKV_AWS_45`, `CKV_AWS_61`, `CKV_AWS_70`, `CKV_AWS_93`, `CKV_AWS_112`, `CKV_AWS_113`, `CKV_AWS_121`, `CKV_AWS_165`, `CKV_AWS_192`, `CKV_AWS_208`, `CKV_AWS_213`, `CKV_AWS_250`, `CKV_AWS_256`, `CKV_AWS_274`, `CKV_AWS_287`, `CKV_AWS_288`, `CKV_AWS_289`, `CKV_AWS_290`, `CKV_AWS_342`, `CKV_AWS_355`, `CKV_AWS_375`, `CKV_AWS_379`, `CKV_AWS_385`, `CKV_AWS_387`, `CKV_AWS_393`.
+Terraform AWS resource ids still missing: `CKV_AWS_45`, `CKV_AWS_70`, `CKV_AWS_121`, `CKV_AWS_165`, `CKV_AWS_192`, `CKV_AWS_208`, `CKV_AWS_250`, `CKV_AWS_256`, `CKV_AWS_274`, `CKV_AWS_287`, `CKV_AWS_288`, `CKV_AWS_289`, `CKV_AWS_290`, `CKV_AWS_342`, `CKV_AWS_355`, `CKV_AWS_375`, `CKV_AWS_379`, `CKV_AWS_385`, `CKV_AWS_387`, `CKV_AWS_393`.
 
 `CKV_AWS_45` and `CKV_AWS_287`–`CKV_AWS_290` are the IAM policy-document checks called out in fidelity.md. They need more than the current attribute dialect.
 
@@ -89,7 +91,7 @@ Known engine limits that later boxes depend on:
 
 Ship this before every milestone box, including the SARIF path fix in 0.6.0 ([#84](https://github.com/jose-compu/rustmaninoff/issues/84)). One patch. It does not close 0.17.0.
 
-- [ ] Benchmark in CI with regression reporting ([#89](https://github.com/jose-compu/rustmaninoff/issues/89)). On every pull request and on pushes to `main`, build this commit and `main` on the same runner and scan fixed corpora: a large Terraform tree, Kubernetes, CloudFormation, Dockerfiles, and a Terraform plan JSON. Several iterations; report the median and the spread. Write the table (baseline, pull request, absolute delta, percent delta, peak memory when available) to the job summary and to one sticky pull request comment. Warn above 5% slower. Fail above 15% slower. Both limits are configuration. Keep `main`'s medians as a workflow artifact or on a data branch. An unexplained fail stays red.
+- [x] Benchmark in CI with regression reporting ([#89](https://github.com/jose-compu/rustmaninoff/issues/89)). On every pull request and on pushes to `main`, build this commit and `main` on the same runner and scan fixed corpora: a large Terraform tree, Kubernetes, CloudFormation, Dockerfiles, and a Terraform plan JSON. Several iterations; report the median and the spread. Write the table (baseline, pull request, absolute delta, percent delta, peak memory when available) to the job summary and to one sticky pull request comment. Warn above 5% slower. Fail above 15% slower. Both limits are configuration. Keep `main`'s medians as a workflow artifact or on a data branch. An unexplained fail stays red.
 
 ## Milestones
 
@@ -128,16 +130,16 @@ Goal: every id in the Kubernetes snapshot is implemented, or fidelity.md records
 Goal: each missing `CKV_AWS_*` resource id is either a real check with fixtures, or a row in fidelity.md that names the engine limit. Required for 1.0. The 36.2% label gets corrected first so later patches are aimed at the 25, not at Azure.
 
 - [ ] Split the fidelity table: one row for the 928-id Terraform resource directory, one row for `CKV_AWS_*` (336/361). Same change in the README sentence that says "~36%".
-- [ ] `CKV_AWS_61`
+- [x] `CKV_AWS_61`
 - [ ] `CKV_AWS_70`
-- [ ] `CKV_AWS_93`
-- [ ] `CKV_AWS_112`
-- [ ] `CKV_AWS_113`
+- [x] `CKV_AWS_93`
+- [x] `CKV_AWS_112`
+- [x] `CKV_AWS_113`
 - [ ] `CKV_AWS_121`
 - [ ] `CKV_AWS_165`
 - [ ] `CKV_AWS_192`
 - [ ] `CKV_AWS_208`
-- [ ] `CKV_AWS_213`
+- [x] `CKV_AWS_213`
 - [ ] `CKV_AWS_250`
 - [ ] `CKV_AWS_256`
 - [ ] `CKV_AWS_274`
