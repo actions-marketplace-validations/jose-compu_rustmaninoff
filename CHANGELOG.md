@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.3 — 2026-11-18
+
+### Fixed
+
+- SARIF `artifactLocation.uri` values are relative to the scan root with forward slashes, `uriBaseId` `%SRCROOT%`, and `originalUriBaseIds` for GitHub code scanning preview ([#84](https://github.com/jose-compu/rustmaninoff/issues/84)).
+- SARIF result messages use the check name only; resource addresses move to result properties when they add context. Redundant Docker file labels are no longer duplicated in the message.
+- Each SARIF rule carries an `informationUri` (Checkov or project docs link); the tool driver `informationUri` is `https://github.com/jose-compu/rustmaninoff`.
+
+### Changed
+
+- Workspace crates and the Action default `version` pin are 0.5.3.
+
 ## 0.5.2 — 2026-11-18
 
 ### Added
