@@ -4,7 +4,9 @@ use std::path::Path;
 use rustmaninoff_engine::Status;
 use rustmaninoff_ir::Framework;
 
-use rustmaninoff_report::{render_json, render_junit, render_sarif, render_text, RenderOptions};
+use rustmaninoff_report::{
+    render_json, render_junit, render_sarif, render_text, RenderOptions, SarifOptions,
+};
 
 use crate::{scan, ScanRequest, Severity};
 
@@ -181,7 +183,12 @@ fn sensitive_plan_values_never_appear_in_report_outputs() {
     };
     let cli = render_text(&result.findings, &result.diagnostics, &options);
     let json = render_json(&result.findings, &result.diagnostics);
-    let sarif = render_sarif(&result.findings);
+    let sarif = render_sarif(
+        &result.findings,
+        &SarifOptions {
+            scan_root: Some(&request.path),
+        },
+    );
     let junit = render_junit(&result.findings, &result.diagnostics);
     for blob in [&cli, &json, &sarif, &junit] {
         assert!(

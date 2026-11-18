@@ -13,7 +13,9 @@ use rustmaninoff_engine::{
 use rustmaninoff_ir::{
     input_limit, Diagnostic, Framework, ParseOutput, MAX_POLICY_BYTES, MAX_SOURCE_BYTES,
 };
-use rustmaninoff_report::{render_json, render_junit, render_sarif, render_text, RenderOptions};
+use rustmaninoff_report::{
+    render_json, render_junit, render_sarif, render_text, RenderOptions, SarifOptions,
+};
 use serde::Deserialize;
 
 static POLICIES: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/policies");
@@ -542,7 +544,12 @@ fn emit(request: &ScanRequest, result: &ScanResult) -> anyhow::Result<()> {
                 request.json_file.as_deref(),
             )?,
             "sarif" => write_output(
-                &render_sarif(&result.findings),
+                &render_sarif(
+                    &result.findings,
+                    &SarifOptions {
+                        scan_root: Some(&request.path),
+                    },
+                ),
                 request.sarif_file.as_deref(),
             )?,
             "junit" => write_output(

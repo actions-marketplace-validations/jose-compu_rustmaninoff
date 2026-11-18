@@ -1,6 +1,8 @@
 use proptest::prelude::*;
 use rustmaninoff_parser_terraform::parse_plan;
-use rustmaninoff_report::{render_json, render_junit, render_sarif, render_text, RenderOptions};
+use rustmaninoff_report::{
+    render_json, render_junit, render_sarif, render_text, RenderOptions, SarifOptions,
+};
 
 const CANARY: &str = "SENSITIVE_CANARY_PROP_";
 
@@ -35,7 +37,7 @@ proptest! {
         let blobs = [
             render_text(&[], &output.diagnostics, &options),
             render_json(&[], &output.diagnostics),
-            render_sarif(&[]),
+            render_sarif(&[], &SarifOptions::default()),
             render_junit(&[], &output.diagnostics),
         ];
         for blob in blobs {

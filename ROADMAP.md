@@ -1,6 +1,6 @@
 # Rustmaninoff roadmap
 
-Current release: **0.5.2**. This file is the queue for daily releases. Tick a box in the same commit that ships the work.
+Current release: **0.5.3**. This file is the queue for daily releases. Tick a box in the same commit that ships the work.
 
 Position, unchanged: Checkov-compatible CKV policies, one Rust binary, fast. Run it next to Trivy. Trivy keeps CVEs, image layers, and SBOMs. Rustmaninoff does not grow a vulnerability database ([#8](https://github.com/jose-compu/rustmaninoff/issues/8) is closed as out of scope).
 
@@ -80,7 +80,7 @@ Known engine limits that later boxes depend on:
 - `CKV_K8S_34` does not mean what Checkov means (theirs is "Tiller is absent"; ours is secrets via `envFrom`).
 - Plan scans read `planned_values` for the whole post-apply state. `resource_changes` actions are not used as a filter ([#80](https://github.com/jose-compu/rustmaninoff/issues/80)).
 - Plan graph edges are `depends_on` only ([#81](https://github.com/jose-compu/rustmaninoff/issues/81)).
-- SARIF `artifactLocation.uri` keeps the absolute path the parser opened. `informationUri` is `https://github.com/rustmaninoff/rustmaninoff`, which is not this repository ([#84](https://github.com/jose-compu/rustmaninoff/issues/84)).
+- SARIF relative paths and rule help links ship in 0.5.3 ([#84](https://github.com/jose-compu/rustmaninoff/issues/84)); GitHub Code Scanning can open matched files.
 - Local modules, `count`, and `for_each` are not expanded ([#17](https://github.com/jose-compu/rustmaninoff/issues/17)). Resolved interpolations do not become graph edges ([#19](https://github.com/jose-compu/rustmaninoff/issues/19)).
 - There is no Helm or Kustomize framework ([#3](https://github.com/jose-compu/rustmaninoff/issues/3)). `Framework::parse("helm")` is `None`.
 - There is no baseline file ([#58](https://github.com/jose-compu/rustmaninoff/issues/58)).
@@ -101,7 +101,7 @@ Each box is one patch unless the text says it is the minor closer. The [next pat
 
 Goal: a plan scan reports resources that the plan is creating or updating, graph checks run when the plan still shows the relationship, and GitHub code scanning can open the file. Sensitive redaction stays as 0.5.1 left it. Required for 1.0.
 
-- [ ] SARIF locations are relative to the scan root, with forward slashes and `uriBaseId` `%SRCROOT%`. The message stays the check name. Set `informationUri` to `https://github.com/jose-compu/rustmaninoff`. Fixture: an absolute path under the scan root ([#84](https://github.com/jose-compu/rustmaninoff/issues/84)).
+- [x] SARIF locations are relative to the scan root, with forward slashes and `uriBaseId` `%SRCROOT%`. The message stays the check name. Set `informationUri` to `https://github.com/jose-compu/rustmaninoff`. Fixture: an absolute path under the scan root ([#84](https://github.com/jose-compu/rustmaninoff/issues/84)). Shipped in 0.5.3.
 - [ ] `terraform_plan` reads attributes from `resource_changes[].change.after`. Default actions are `create` and `update` (including replace). Skip `no-op`, `read`, and pure `delete`. `--plan-scope all` keeps today's whole-state behavior. Unknown leaves stay unknown ([#80](https://github.com/jose-compu/rustmaninoff/issues/80)).
 - [ ] Emit plan edges for `depends_on` and for planned values that are another resource address. Run the existing `CKV2_*` pass on those resources. Do not invent an edge from a name that merely matches ([#81](https://github.com/jose-compu/rustmaninoff/issues/81)).
 - [ ] Add the plan fixtures from [#82](https://github.com/jose-compu/rustmaninoff/issues/82) (managed resource, data source, child-module address, `after_unknown`, delete versus create once the scope box is done, sensitive redaction) and a plan section in `docs/fidelity.md`.

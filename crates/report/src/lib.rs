@@ -1,7 +1,13 @@
 //! Render scan results for humans and CI.
 
-use rustmaninoff_engine::{Finding, Severity, Status};
+mod sarif;
+
+use rustmaninoff_engine::{Finding, Status};
 use rustmaninoff_ir::Diagnostic;
+
+pub use sarif::{
+    render_sarif, SarifOptions, DEFAULT_RULE_INFORMATION_URI, SRCROOT_BASE_ID, TOOL_INFORMATION_URI,
+};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -110,60 +116,6 @@ pub fn render_json(findings: &[Finding], diagnostics: &[Diagnostic]) -> String {
     serde_json::to_string_pretty(&value).unwrap_or_else(|_| "{}".to_string())
 }
 
-pub fn render_sarif(findings: &[Finding]) -> String {
-    let failed: Vec<_> = findings
-        .iter()
-        .filter(|finding| finding.status == Status::Failed)
-        .collect();
-    let mut rules = Vec::new();
-    let mut seen = Vec::new();
-    for finding in &failed {
-        if seen.contains(&finding.check_id) {
-            continue;
-        }
-        seen.push(finding.check_id.clone());
-        rules.push(serde_json::json!({
-            "id": finding.check_id.as_ref(),
-            "shortDescription": {"text": finding.check_name.as_ref()},
-            "fullDescription": {"text": finding.check_name.as_ref()},
-            "defaultConfiguration": {"level": sarif_level(finding.severity)},
-            "helpUri": finding.guidelines.as_deref().unwrap_or(""),
-        }));
-    }
-    let results = failed
-        .iter()
-        .map(|finding| {
-            serde_json::json!({
-                "ruleId": finding.check_id.as_ref(),
-                "level": sarif_level(finding.severity),
-                "message": {"text": format!("{} {}", finding.check_name, finding.resource_address)},
-                "locations": [{
-                    "physicalLocation": {
-                        "artifactLocation": {"uri": sarif_uri(&finding.file)},
-                        "region": {"startLine": finding.start_line.max(1)}
-                    }
-                }]
-            })
-        })
-        .collect::<Vec<_>>();
-    let value = serde_json::json!({
-        "version": "2.1.0",
-        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
-        "runs": [{
-            "tool": {
-                "driver": {
-                    "name": "rustmaninoff",
-                    "version": VERSION,
-                    "informationUri": "https://github.com/rustmaninoff/rustmaninoff",
-                    "rules": rules,
-                }
-            },
-            "results": results,
-        }]
-    });
-    serde_json::to_string_pretty(&value).unwrap_or_else(|_| "{}".to_string())
-}
-
 pub fn render_junit(findings: &[Finding], diagnostics: &[Diagnostic]) -> String {
     let cases = findings.len() + diagnostics.len();
     let failures = count(findings, Status::Failed) + diagnostics.len();
@@ -224,18 +176,6 @@ fn finding_json(finding: &Finding) -> serde_json::Value {
         "skip_reason": finding.skip_reason,
         "framework": finding.framework.as_ref(),
     })
-}
-
-fn sarif_level(severity: Severity) -> &'static str {
-    match severity {
-        Severity::Critical | Severity::High => "error",
-        Severity::Medium => "warning",
-        Severity::Low => "note",
-    }
-}
-
-fn sarif_uri(path: &str) -> String {
-    path.replace('\\', "/")
 }
 
 fn xml_escape(value: &str) -> String {
