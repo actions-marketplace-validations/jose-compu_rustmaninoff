@@ -4,7 +4,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use rustmaninoff_engine::{Severity, Status};
 use rustmaninoff_ir::Framework;
-use rustmaninoff_report::{render_json, render_junit, render_sarif, render_text, RenderOptions};
+use rustmaninoff_report::{
+    render_json, render_junit, render_sarif, render_text, RenderOptions, SarifOptions,
+};
 
 use crate::{builtin_policies, scan, ScanRequest};
 
@@ -190,7 +192,7 @@ resource "aws_ebs_volume" "bad" {
     };
     let text = render_text(&result.findings, &result.diagnostics, &options);
     let json = render_json(&result.findings, &result.diagnostics);
-    let sarif = render_sarif(&result.findings);
+    let sarif = render_sarif(&result.findings, &SarifOptions::default());
     let junit = render_junit(&result.findings, &result.diagnostics);
     println!("{text}");
     assert!(text.contains("FAILED"));

@@ -7,7 +7,9 @@ use std::path::Path;
 use rustmaninoff_engine::Status;
 use rustmaninoff_ir::{lookup, Framework};
 use rustmaninoff_parser_terraform::{parse_plan, SENSITIVE_PLACEHOLDER};
-use rustmaninoff_report::{render_json, render_junit, render_sarif, render_text, RenderOptions};
+use rustmaninoff_report::{
+    render_json, render_junit, render_sarif, render_text, RenderOptions, SarifOptions,
+};
 
 use crate::{scan, ScanRequest, Severity};
 
@@ -24,6 +26,7 @@ pub(crate) fn matrix_plan() -> std::path::PathBuf {
 pub(crate) fn all_report_blobs(
     findings: &[rustmaninoff_engine::Finding],
     diagnostics: &[rustmaninoff_ir::Diagnostic],
+    scan_root: &Path,
 ) -> Vec<(String, String)> {
     let mut blobs = Vec::new();
     for (name, compact, show_passed, show_unknown) in [
@@ -42,7 +45,15 @@ pub(crate) fn all_report_blobs(
         ));
     }
     blobs.push(("json".into(), render_json(findings, diagnostics)));
-    blobs.push(("sarif".into(), render_sarif(findings)));
+    blobs.push((
+        "sarif".into(),
+        render_sarif(
+            findings,
+            &SarifOptions {
+                scan_root: Some(scan_root),
+            },
+        ),
+    ));
     blobs.push(("junit".into(), render_junit(findings, diagnostics)));
     let mut debug = String::new();
     for finding in findings {
@@ -59,7 +70,10 @@ fn normalize_golden_paths(blob: &str) -> String {
     let marker = "testdata/terraform-plan/sensitive_matrix.tfplan.json";
     let re = regex::Regex::new(r#"[^\s"]*testdata/terraform-plan/sensitive_matrix\.tfplan\.json"#)
         .expect("regex");
-    re.replace_all(blob, marker).into_owned()
+    let blob = re.replace_all(blob, marker).into_owned();
+    let root_marker = "file://TESTROOT/testdata/terraform-plan";
+    let file_uri = regex::Regex::new(r#"file://[^"]*testdata/terraform-plan"#).expect("regex");
+    file_uri.replace_all(&blob, root_marker).into_owned()
 }
 
 pub(crate) fn assert_no_canaries(blobs: &[(String, String)]) {
@@ -93,7 +107,11 @@ pub(crate) fn sensitive_scan_request(path: std::path::PathBuf) -> ScanRequest {
 fn matrix_fixture_reports_contain_no_canaries() {
     let result = scan(&sensitive_scan_request(matrix_plan())).expect("scan");
     assert_eq!(result.exit_code, 1);
-    assert_no_canaries(&all_report_blobs(&result.findings, &result.diagnostics));
+    assert_no_canaries(&all_report_blobs(
+        &result.findings,
+        &result.diagnostics,
+        &matrix_plan(),
+    ));
 }
 
 #[test]
@@ -107,7 +125,11 @@ fn matrix_failing_check_still_fails_without_canary_leak() {
         failed.is_some(),
         "expected CKV_AWS_20 failure on public-read"
     );
-    assert_no_canaries(&all_report_blobs(&result.findings, &result.diagnostics));
+    assert_no_canaries(&all_report_blobs(
+        &result.findings,
+        &result.diagnostics,
+        &matrix_plan(),
+    ));
 }
 
 #[test]
@@ -167,7 +189,7 @@ fn parse_output_debug_has_no_canaries_after_redaction() {
     for canary in sensitive_canaries {
         assert!(!debug.contains(canary), "IR debug leaked {canary}");
     }
-    assert_no_canaries(&all_report_blobs(&[], &output.diagnostics));
+    assert_no_canaries(&all_report_blobs(&[], &output.diagnostics, &matrix_plan()));
 }
 
 #[test]
@@ -179,7 +201,7 @@ fn malformed_plan_and_missing_sensitive_values_do_not_panic() {
     let partial = fs::read_to_string(root.join("s3_public_fail.tfplan.json")).expect("read");
     let output = parse_plan(&root.join("s3_public_fail.tfplan.json"), &partial);
     assert!(!output.resources.is_empty());
-    let blobs = all_report_blobs(&[], &output.diagnostics);
+    let blobs = all_report_blobs(&[], &output.diagnostics, &matrix_plan());
     assert_no_canaries(&blobs);
 }
 
@@ -187,7 +209,8 @@ fn malformed_plan_and_missing_sensitive_values_do_not_panic() {
 fn golden_cli_json_sarif_junit_snapshots() {
     let result = scan(&sensitive_scan_request(matrix_plan())).expect("scan");
     let root = fixture_root().join("golden");
-    for (name, blob) in all_report_blobs(&result.findings, &result.diagnostics)
+    let plan = matrix_plan();
+    for (name, blob) in all_report_blobs(&result.findings, &result.diagnostics, &plan)
         .into_iter()
         .filter(|(name, _)| matches!(name.as_str(), "cli_default" | "json" | "sarif" | "junit"))
     {
@@ -214,7 +237,8 @@ fn golden_refresh_env_var() {
     let result = scan(&sensitive_scan_request(matrix_plan())).expect("scan");
     let root = fixture_root().join("golden");
     fs::create_dir_all(&root).expect("mkdir golden");
-    for (name, blob) in all_report_blobs(&result.findings, &result.diagnostics)
+    let plan = matrix_plan();
+    for (name, blob) in all_report_blobs(&result.findings, &result.diagnostics, &plan)
         .into_iter()
         .filter(|(name, _)| matches!(name.as_str(), "cli_default" | "json" | "sarif" | "junit"))
     {

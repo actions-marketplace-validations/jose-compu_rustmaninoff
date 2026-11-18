@@ -65,7 +65,7 @@ fn text_sarif_and_junit_cover_remaining_labels() {
     assert!(full.contains("UNKNOWN"));
     let hidden = render_text(&findings, &[], &RenderOptions::default());
     assert!(!hidden.contains("UNKNOWN"));
-    let sarif = render_sarif(&findings);
+    let sarif = render_sarif(&findings, &SarifOptions::default());
     assert!(sarif.contains("warning"));
     assert!(sarif.contains("note"));
     assert!(sarif.contains("dir/main.tf"));
