@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.2 — 2026-11-18
+
+### Added
+
+- CI benchmark regression gate on every pull request and on pushes to `main`: compares release binaries on fixed corpora (pinned Terraform module, Kubernetes, CloudFormation, Dockerfiles, Terraform plan JSON), writes the table to the job summary and one sticky PR comment, warns above 5% slower, fails above 15% (configurable in `benchmarks/regression_thresholds.json`). Main-branch medians are stored as workflow artifacts ([#89](https://github.com/jose-compu/rustmaninoff/issues/89)).
+- Five Terraform AWS resource checks from the 0.8.0 queue: `CKV_AWS_61`, `CKV_AWS_93`, `CKV_AWS_112`, `CKV_AWS_113`, `CKV_AWS_213` (IAM assume-role scope, S3 policy lockout guard, Session Manager encryption and logging, ELB TLS policy hardening).
+
+### Changed
+
+- Built-in catalog: **541** checks (was 536). Terraform AWS exact overlap: **341 / 928** (`docs/fidelity.md`).
+- Workspace crates and the Action default `version` pin are 0.5.2.
+
 ## 0.5.1 — 2026-11-17
 
 ### Added

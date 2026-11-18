@@ -3,3 +3,4 @@
 .DS_Store
 criterion-output.txt
 benchmarks/.cache/
+__pycache__/

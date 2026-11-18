@@ -59,6 +59,11 @@ bench_cmd "rustmaninoff full" "$BIN" scan "$CORPUS" --soft-fail --compact
 bench_cmd "rustmaninoff terraform" "$BIN" scan "$CORPUS/terraform" --framework terraform --soft-fail --compact
 bench_cmd "rustmaninoff cloudformation" "$BIN" scan "$CORPUS/cloudformation" --framework cloudformation --soft-fail --compact
 bench_cmd "rustmaninoff kubernetes" "$BIN" scan "$CORPUS/kubernetes" --framework kubernetes --soft-fail --compact
+bench_cmd "rustmaninoff docker" "$BIN" scan "$CORPUS/docker" --framework docker --soft-fail --compact
+PLAN_JSON="${ROOT}/testdata/terraform-plan/sensitive_matrix.tfplan.json"
+if [[ -f "$PLAN_JSON" ]]; then
+  bench_cmd "rustmaninoff terraform_plan" "$BIN" scan "$PLAN_JSON" --framework terraform_plan --soft-fail --compact
+fi
 
 if command -v checkov >/dev/null 2>&1; then
   echo
