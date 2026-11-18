@@ -14,4 +14,83 @@ jobs:
           components: rustfmt, clippy
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: python3 scripts/test_bench_ci_compare.py -v
       - run: cargo test --workspace -- --nocapture
+
+  benchmark:
+    runs-on: ubuntu-latest
+    env:
+      BENCH_RUNS: "3"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build candidate binary
+        run: cargo build --release -p rustmaninoff --locked
+      - name: Build main baseline binary
+        id: baseline
+        if: github.event_name == 'pull_request'
+        run: |
+          git worktree add ../rustmaninoff-main origin/main
+          cargo build --release -p rustmaninoff --locked --manifest-path ../rustmaninoff-main/Cargo.toml
+          echo "bin=${{ github.workspace }}/../rustmaninoff-main/target/release/rustmaninoff" >> "$GITHUB_OUTPUT"
+      - name: Compare PR against main
+        if: github.event_name == 'pull_request'
+        id: compare
+        env:
+          CANDIDATE_BIN: ${{ github.workspace }}/target/release/rustmaninoff
+          BASELINE_BIN: ${{ steps.baseline.outputs.bin }}
+        run: |
+          python3 scripts/bench_ci_compare.py \
+            --baseline-bin "$BASELINE_BIN" \
+            --candidate-bin "$CANDIDATE_BIN" \
+            --summary-out bench-summary.md \
+            --json-out bench-results.json \
+            --markdown-out bench-comment.md
+      - name: Record main baseline
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          python3 scripts/bench_ci_compare.py \
+            --record-main \
+            --candidate-bin target/release/rustmaninoff \
+            --commit "${{ github.sha }}" \
+            --json-out bench-main.json \
+            --summary-out bench-summary.md
+      - name: Job summary
+        if: always() && hashFiles('bench-summary.md') != ''
+        run: cat bench-summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload main benchmark artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-main-${{ github.sha }}
+          path: bench-main.json
+          if-no-files-found: ignore
+      - name: Update sticky PR comment
+        if: github.event_name == 'pull_request' && hashFiles('bench-comment.md') != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('bench-comment.md', 'utf8');
+            const marker = '<!-- rustmaninoff-bench-regression -->';
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
