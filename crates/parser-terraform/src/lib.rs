@@ -3,7 +3,9 @@
 mod eval;
 mod plan;
 
-pub use plan::{looks_like_plan, parse_plan, SENSITIVE_PLACEHOLDER};
+pub use plan::{
+    looks_like_plan, parse_plan, parse_plan_with_scope, PlanScope, SENSITIVE_PLACEHOLDER,
+};
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;

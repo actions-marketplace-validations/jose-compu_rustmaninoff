@@ -11,7 +11,20 @@ use rustmaninoff_ir::{
 /// Stable placeholder for Terraform-marked sensitive plan attributes.
 pub const SENSITIVE_PLACEHOLDER: &str = "(sensitive value)";
 
+/// Which Terraform plan resources to materialize for scanning.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlanScope {
+    /// Create, update, and replace only. Attributes from `change.after`.
+    Changes,
+    /// Whole `planned_values` walk. Attributes from `values`.
+    All,
+}
+
 pub fn parse_plan(path: &Path, source: &str) -> ParseOutput {
+    parse_plan_with_scope(path, source, PlanScope::All)
+}
+
+pub fn parse_plan_with_scope(path: &Path, source: &str, scope: PlanScope) -> ParseOutput {
     let parsed: serde_json::Value = match serde_json::from_str(source) {
         Ok(value) => value,
         Err(err) => {
@@ -26,6 +39,13 @@ pub fn parse_plan(path: &Path, source: &str) -> ParseOutput {
             };
         }
     };
+    match scope {
+        PlanScope::All => parse_plan_all(path, source, &parsed),
+        PlanScope::Changes => parse_plan_changes(path, source, &parsed),
+    }
+}
+
+fn parse_plan_all(path: &Path, source: &str, parsed: &serde_json::Value) -> ParseOutput {
     let Some(root_module) = parsed
         .get("planned_values")
         .and_then(|value| value.get("root_module"))
@@ -40,8 +60,8 @@ pub fn parse_plan(path: &Path, source: &str) -> ParseOutput {
             edges: Vec::new(),
         };
     };
-    let unknown_by_address = unknown_keys(&parsed);
-    let sensitive_by_address = sensitive_keys(&parsed);
+    let unknown_by_address = unknown_keys(parsed);
+    let sensitive_by_address = sensitive_keys(parsed);
     let skips = skips_between(&extract_skip_comments(source), 1, usize::MAX);
     let mut output = ParseOutput::default();
     walk_module(
@@ -53,6 +73,140 @@ pub fn parse_plan(path: &Path, source: &str) -> ParseOutput {
         &mut output,
     );
     output
+}
+
+fn parse_plan_changes(path: &Path, source: &str, parsed: &serde_json::Value) -> ParseOutput {
+    let has_root = parsed
+        .get("planned_values")
+        .and_then(|value| value.get("root_module"))
+        .is_some();
+    let changes_key = parsed.get("resource_changes");
+    if changes_key.is_none() && !has_root {
+        return ParseOutput {
+            diagnostics: vec![rustmaninoff_ir::Diagnostic {
+                file: path.to_path_buf(),
+                line: 1,
+                message: "missing planned_values.root_module".to_string(),
+            }],
+            resources: Vec::new(),
+            edges: Vec::new(),
+        };
+    }
+    let Some(changes) = changes_key.and_then(|value| value.as_array()) else {
+        return ParseOutput::default();
+    };
+    if changes.is_empty() {
+        return ParseOutput::default();
+    }
+    let unknown_by_address = unknown_keys(parsed);
+    let sensitive_by_address = sensitive_keys(parsed);
+    let skips = skips_between(&extract_skip_comments(source), 1, usize::MAX);
+    let mut output = ParseOutput::default();
+    for entry in changes {
+        emit_resource_change(
+            path,
+            entry,
+            &unknown_by_address,
+            &sensitive_by_address,
+            &skips,
+            &mut output,
+        );
+    }
+    output
+}
+
+fn resource_identity<'a>(
+    entry: &'a serde_json::Value,
+    address: &'a str,
+) -> Option<(&'a str, &'a str, &'a str)> {
+    if let (Some(type_name), Some(short_name)) = (
+        entry.get("type").and_then(|value| value.as_str()),
+        entry.get("name").and_then(|value| value.as_str()),
+    ) {
+        let mode = entry
+            .get("mode")
+            .and_then(|value| value.as_str())
+            .unwrap_or("managed");
+        return Some((mode, type_name, short_name));
+    }
+    let parts: Vec<&str> = address.split('.').collect();
+    if parts.len() >= 3 && parts[0] == "data" {
+        return Some(("data", parts[1], parts[2]));
+    }
+    if parts.len() >= 2 {
+        return Some(("managed", parts[parts.len() - 2], parts[parts.len() - 1]));
+    }
+    None
+}
+
+fn change_in_scope(actions: &[serde_json::Value]) -> bool {
+    actions
+        .iter()
+        .any(|action| matches!(action.as_str(), Some("create") | Some("update")))
+}
+
+fn emit_resource_change(
+    path: &Path,
+    entry: &serde_json::Value,
+    unknown_by_address: &HashMap<String, BTreeMap<String, bool>>,
+    sensitive_by_address: &HashMap<String, BTreeMap<String, bool>>,
+    skips: &[rustmaninoff_ir::Skip],
+    output: &mut ParseOutput,
+) {
+    let actions = entry
+        .get("change")
+        .and_then(|value| value.get("actions"))
+        .and_then(|value| value.as_array())
+        .map(|items| items.as_slice())
+        .unwrap_or(&[]);
+    if !change_in_scope(actions) {
+        return;
+    }
+    let address = match entry.get("address").and_then(|value| value.as_str()) {
+        Some(value) => value,
+        None => return,
+    };
+    let (mode, type_name, short_name) = match resource_identity(entry, address) {
+        Some(value) => value,
+        None => return,
+    };
+    let (kind, resource_type) = match mode {
+        "data" => (ResourceKind::Data, format!("data.{type_name}")),
+        _ => (ResourceKind::Managed, type_name.to_string()),
+    };
+    let name = prefixed_name(address, type_name, short_name);
+    let after = entry.get("change").and_then(|value| value.get("after"));
+    let mut attributes = match after {
+        Some(value) if !value.is_null() => json_to_value(value),
+        _ => Value::Object(BTreeMap::new()),
+    };
+    if let Some(flags) = unknown_by_address.get(address) {
+        for path in flags.keys() {
+            if flags.get(path) == Some(&true) {
+                set_unknown_path(&mut attributes, path);
+            }
+        }
+    }
+    if let Some(flags) = sensitive_by_address.get(address) {
+        for path in flags.keys() {
+            if flags.get(path) == Some(&true) {
+                set_redacted_path(&mut attributes, path);
+            }
+        }
+    }
+    let from = ResourceRef::new(resource_type.clone(), name.clone()).with_file(path.to_path_buf());
+    collect_depends_on(output, &from, &attributes);
+    output.resources.push(Resource {
+        framework: Framework::TerraformPlan,
+        kind,
+        resource_type,
+        name,
+        attributes,
+        file: path.to_path_buf(),
+        start_line: 1,
+        end_line: 1,
+        skips: skips.to_vec(),
+    });
 }
 
 fn unknown_keys(plan: &serde_json::Value) -> HashMap<String, BTreeMap<String, bool>> {

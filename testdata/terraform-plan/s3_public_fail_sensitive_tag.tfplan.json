@@ -23,6 +23,14 @@
     {
       "address": "aws_s3_bucket.bad",
       "change": {
+        "actions": ["create"],
+        "after": {
+          "bucket": "data",
+          "acl": "public-read",
+          "tags": {
+            "token": "SENSITIVE_CANARY_ACL_PAIR"
+          }
+        },
         "sensitive_values": {
           "tags": {
             "token": true

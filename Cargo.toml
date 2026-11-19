@@ -12,12 +12,11 @@ members = [
 ]
 
 [workspace.package]
-version = "0.5.3"
+version = "0.5.4"
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/jose-compu/rustmaninoff"
-homepage = "https://github.com/jose-compu/rustmaninoff"
-readme = "README.md"
+homepage = "https://jose-compu.github.io/rustmaninoff/"
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -25,10 +24,10 @@ serde_json = "1"
 serde_yaml = "0.9"
 thiserror = "1"
 regex = "1"
-rustmaninoff-ir = { version = "0.5.3", path = "crates/ir" }
-rustmaninoff-engine = { version = "0.5.3", path = "crates/engine" }
-rustmaninoff-parser-terraform = { version = "0.5.3", path = "crates/parser-terraform" }
-rustmaninoff-parser-cfn = { version = "0.5.3", path = "crates/parser-cfn" }
-rustmaninoff-parser-k8s = { version = "0.5.3", path = "crates/parser-k8s" }
-rustmaninoff-parser-docker = { version = "0.5.3", path = "crates/parser-docker" }
-rustmaninoff-report = { version = "0.5.3", path = "crates/report" }
+rustmaninoff-ir = { version = "0.5.4", path = "crates/ir" }
+rustmaninoff-engine = { version = "0.5.4", path = "crates/engine" }
+rustmaninoff-parser-terraform = { version = "0.5.4", path = "crates/parser-terraform" }
+rustmaninoff-parser-cfn = { version = "0.5.4", path = "crates/parser-cfn" }
+rustmaninoff-parser-k8s = { version = "0.5.4", path = "crates/parser-k8s" }
+rustmaninoff-parser-docker = { version = "0.5.4", path = "crates/parser-docker" }
+rustmaninoff-report = { version = "0.5.4", path = "crates/report" }
