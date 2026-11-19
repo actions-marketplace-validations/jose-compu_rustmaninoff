@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.4 — 2026-11-19
+
+### Fixed
+
+- Default `terraform_plan` scans report only resources this apply creates or updates (including replace). Attributes come from `resource_changes[].change.after`. Unchanged, read-only, and delete-only resources are skipped ([#80](https://github.com/jose-compu/rustmaninoff/issues/80)).
+- `--plan-scope all` keeps the previous whole-state plan scan (0.5.0 through 0.5.3 behavior).
+
+### Changed
+
+- Unknown plan leaves still do not fail the process. Sensitive values stay redacted as `(sensitive value)`.
+- Workspace `homepage` is the project site; unused workspace `readme` is removed so `cargo test` and publish no longer warn ([#85](https://github.com/jose-compu/rustmaninoff/issues/85)).
+- Workspace crates and the Action default `version` pin are 0.5.4.
+
 ## 0.5.3 — 2026-11-18
 
 ### Fixed
@@ -37,7 +50,6 @@
 ### Notes
 
 - This is not a secrets scanner: only provider-schema–marked sensitive values are redacted. Keep plan artifacts out of logs and CI output; unmarked values remain your pipeline’s responsibility.
-
 ## 0.5.0 — 2026-11-17
 
 ### Added

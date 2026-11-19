@@ -22,6 +22,7 @@
     {
       "address": "aws_s3_bucket.bad",
       "change": {
+        "actions": ["create"],
         "after": {
           "acl": "public-read",
           "tags": {

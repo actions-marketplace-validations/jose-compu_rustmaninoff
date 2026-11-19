@@ -5,6 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use rustmaninoff_engine::Status;
 use rustmaninoff_ir::Framework;
+use rustmaninoff_parser_terraform::PlanScope;
 
 use crate::{scan, ScanRequest, Severity};
 
@@ -31,6 +32,7 @@ fn request(path: std::path::PathBuf) -> ScanRequest {
         sarif_file: None,
         junit_file: None,
         excluded: vec![".git".into()],
+        plan_scope: PlanScope::Changes,
     }
 }
 
