@@ -311,3 +311,156 @@ fn plan_scope_changes_skips_unchanged_public_bucket() {
 fn invalid_plan_scope_is_a_usage_error() {
     assert!(parse_plan_scope("nope").is_err());
 }
+
+fn logging_plan_fixture(bucket_after: &str, with_config_ref: bool) -> String {
+    let configuration = if with_config_ref {
+        r#",
+  "configuration": {
+    "root_module": {
+      "resources": [{
+        "address": "aws_s3_bucket_logging.data",
+        "mode": "managed",
+        "type": "aws_s3_bucket_logging",
+        "name": "data",
+        "expressions": {
+          "bucket": { "references": ["aws_s3_bucket.data.id"] }
+        }
+      }]
+    }
+  }"#
+    } else {
+        ""
+    };
+    format!(
+        r#"{{
+  "format_version": "1.2",
+  "planned_values": {{ "root_module": {{}} }},
+  "resource_changes": [
+    {{
+      "address": "aws_s3_bucket.data",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "data",
+      "change": {{ "actions": ["create"], "after": {{ "bucket": "my-bucket" }} }}
+    }},
+    {{
+      "address": "aws_s3_bucket_logging.data",
+      "mode": "managed",
+      "type": "aws_s3_bucket_logging",
+      "name": "data",
+      "change": {{
+        "actions": ["create"],
+        "after": {{ "bucket": {bucket_after}, "target_bucket": "logs-target" }}
+      }}
+    }}
+  ]{configuration}
+}}"#
+    )
+}
+
+fn scan_logging_plan(path: std::path::PathBuf, checks: Vec<String>) -> crate::ScanResult {
+    scan(&ScanRequest {
+        path,
+        frameworks: vec![Framework::TerraformPlan],
+        checks,
+        skip_checks: Vec::new(),
+        fail_on: Severity::High,
+        external_dirs: Vec::new(),
+        var_files: Vec::new(),
+        show_unknown: false,
+        show_passed: false,
+        compact: false,
+        soft_fail: false,
+        outputs: vec!["cli".into()],
+        json_file: None,
+        sarif_file: None,
+        junit_file: None,
+        excluded: vec![".git".into()],
+        plan_scope: PlanScope::Changes,
+    })
+    .expect("scan plan")
+}
+
+#[test]
+fn plan_ckv2_s3_logging_graph_checks() {
+    let dir = std::env::temp_dir().join(format!(
+        "rustmaninoff-plan-ckv2-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let bucket_only = dir.join("bucket_only.tfplan.json");
+    let bucket_only_json = r#"{
+  "format_version": "1.2",
+  "planned_values": { "root_module": {} },
+  "resource_changes": [{
+    "address": "aws_s3_bucket.data",
+    "mode": "managed",
+    "type": "aws_s3_bucket",
+    "name": "data",
+    "change": { "actions": ["create"], "after": { "bucket": "my-bucket" } }
+  }]
+}"#;
+    fs::write(&bucket_only, bucket_only_json).unwrap();
+    let fail = scan_logging_plan(
+        bucket_only.clone(),
+        vec!["CKV2_AWS_S3_BUCKET_LOGGING".into()],
+    );
+    assert!(
+        fail.findings.iter().any(|f| {
+            f.check_id.as_ref() == "CKV2_AWS_S3_BUCKET_LOGGING" && f.status == Status::Failed
+        }),
+        "findings={:?}",
+        fail.findings
+    );
+
+    let with_ref = dir.join("with_ref.tfplan.json");
+    fs::write(&with_ref, logging_plan_fixture(r#""my-bucket""#, true)).unwrap();
+    let pass = scan_logging_plan(with_ref, vec!["CKV2_AWS_S3_BUCKET_LOGGING".into()]);
+    assert!(
+        !pass
+            .findings
+            .iter()
+            .any(|f| f.check_id.as_ref() == "CKV2_AWS_S3_BUCKET_LOGGING"
+                && f.status == Status::Failed),
+        "findings={:?}",
+        pass.findings
+    );
+
+    let name_only = dir.join("name_only.tfplan.json");
+    fs::write(&name_only, logging_plan_fixture(r#""my-bucket""#, false)).unwrap();
+    let still_fail = scan_logging_plan(name_only, vec!["CKV2_AWS_S3_BUCKET_LOGGING".into()]);
+    assert!(
+        still_fail.findings.iter().any(|f| {
+            f.check_id.as_ref() == "CKV2_AWS_S3_BUCKET_LOGGING" && f.status == Status::Failed
+        }),
+        "findings={:?}",
+        still_fail.findings
+    );
+
+    let default_fw = scan(&ScanRequest {
+        path: bucket_only,
+        frameworks: Vec::new(),
+        checks: Vec::new(),
+        skip_checks: Vec::new(),
+        fail_on: Severity::High,
+        external_dirs: Vec::new(),
+        var_files: Vec::new(),
+        show_unknown: false,
+        show_passed: false,
+        compact: false,
+        soft_fail: false,
+        outputs: vec!["cli".into()],
+        json_file: None,
+        sarif_file: None,
+        junit_file: None,
+        excluded: vec![".git".into()],
+        plan_scope: PlanScope::Changes,
+    })
+    .expect("default frameworks");
+    assert!(default_fw.findings.is_empty());
+
+    let _ = fs::remove_dir_all(dir);
+}

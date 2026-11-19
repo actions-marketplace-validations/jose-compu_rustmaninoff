@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.5 — 2026-11-19
+
+### Added
+
+- Terraform plan scans follow explicit `depends_on` links and attribute or configuration references whose value is another resource address in the plan (including `configuration` references after Terraform resolves a value to a name). Companion `CKV2_*` checks run on those edges ([#81](https://github.com/jose-compu/rustmaninoff/issues/81)).
+- A string that only matches another resource's name is not treated as a graph edge. Resources this apply does not create or update stay out of the default scan; `--plan-scope all` still includes them.
+
+### Changed
+
+- Unknown plan leaves still do not fail the process. Sensitive values stay redacted as `(sensitive value)`. The built-in catalog remains **541** checks.
+- Workspace crates and the Action default `version` pin are 0.5.5.
+
 ## 0.5.4 — 2026-11-19
 
 ### Fixed
