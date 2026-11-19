@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use rustmaninoff_engine::{evaluate, parse_policy, Status};
-use rustmaninoff_ir::ResourceKind;
+use rustmaninoff_ir::{EdgeKind, ResourceKind};
 
 use super::plan::{
     parse_plan, parse_plan_with_scope, sensitive_paths_for_test, PlanScope, SENSITIVE_PLACEHOLDER,
@@ -479,4 +479,298 @@ fn changes_scope_sensitive_after_is_redacted() {
     let output = parse_plan_with_scope(Path::new("ssm.tfplan.json"), &source, PlanScope::Changes);
     let value = rustmaninoff_ir::lookup(&output.resources[0].attributes, "value");
     assert_eq!(value.values[0].as_str(), Some(SENSITIVE_PLACEHOLDER));
+}
+
+fn s3_logging_changes_plan_without_configuration(bucket_attr: &str) -> String {
+    format!(
+        r#"{{
+  "format_version": "1.2",
+  "planned_values": {{ "root_module": {{}} }},
+  "resource_changes": [
+    {{
+      "address": "aws_s3_bucket.data",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "data",
+      "change": {{ "actions": ["create"], "after": {{ "bucket": "data" }} }}
+    }},
+    {{
+      "address": "aws_s3_bucket_logging.data",
+      "mode": "managed",
+      "type": "aws_s3_bucket_logging",
+      "name": "data",
+      "change": {{
+        "actions": ["create"],
+        "after": {{ "bucket": {bucket_attr}, "target_bucket": "logs.example.com" }}
+      }}
+    }}
+  ]
+}}"#
+    )
+}
+
+fn s3_logging_changes_plan(bucket_attr: &str) -> String {
+    format!(
+        r#"{{
+  "format_version": "1.2",
+  "planned_values": {{ "root_module": {{}} }},
+  "resource_changes": [
+    {{
+      "address": "aws_s3_bucket.data",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "data",
+      "change": {{ "actions": ["create"], "after": {{ "bucket": "data" }} }}
+    }},
+    {{
+      "address": "aws_s3_bucket_logging.data",
+      "mode": "managed",
+      "type": "aws_s3_bucket_logging",
+      "name": "data",
+      "change": {{
+        "actions": ["create"],
+        "after": {{ "bucket": {bucket_attr}, "target_bucket": "logs.example.com" }}
+      }}
+    }}
+  ],
+  "configuration": {{
+    "root_module": {{
+      "resources": [
+        {{
+          "address": "aws_s3_bucket.data",
+          "mode": "managed",
+          "type": "aws_s3_bucket",
+          "name": "data",
+          "expressions": {{ "bucket": {{ "references": [] }} }}
+        }},
+        {{
+          "address": "aws_s3_bucket_logging.data",
+          "mode": "managed",
+          "type": "aws_s3_bucket_logging",
+          "name": "data",
+          "expressions": {{ "bucket": {{ "references": ["aws_s3_bucket.data.id"] }} }}
+        }}
+      ]
+    }}
+  }}
+}}"#
+    )
+}
+
+#[test]
+fn changes_scope_bucket_address_reference_emits_edge() {
+    let source = s3_logging_changes_plan(r#""aws_s3_bucket.data""#);
+    let output = parse_plan_with_scope(Path::new("ref.tfplan.json"), &source, PlanScope::Changes);
+    assert_eq!(output.edges.len(), 1);
+    assert_eq!(output.edges[0].kind, EdgeKind::References);
+    assert_eq!(output.edges[0].from.name, "data");
+    assert_eq!(output.edges[0].from.resource_type, "aws_s3_bucket_logging");
+    assert_eq!(output.edges[0].to.resource_type, "aws_s3_bucket");
+}
+
+#[test]
+fn changes_scope_non_address_bucket_value_emits_no_edge() {
+    for bucket_attr in [r#""data""#, r#""logs.example.com""#] {
+        let source = s3_logging_changes_plan_without_configuration(bucket_attr);
+        let output =
+            parse_plan_with_scope(Path::new("noref.tfplan.json"), &source, PlanScope::Changes);
+        assert!(
+            output.edges.is_empty(),
+            "bucket_attr={bucket_attr} edges={:?}",
+            output.edges
+        );
+    }
+}
+
+#[test]
+fn changes_scope_configuration_reference_resolves_after_name() {
+    let source = s3_logging_changes_plan(r#""my-resolved-bucket-name""#);
+    let output =
+        parse_plan_with_scope(Path::new("cfgref.tfplan.json"), &source, PlanScope::Changes);
+    assert_eq!(output.edges.len(), 1);
+    assert_eq!(output.edges[0].kind, EdgeKind::References);
+    assert_eq!(output.edges[0].via.as_deref(), Some("bucket"));
+}
+
+#[test]
+fn changes_scope_depends_on_attribute_and_configuration() {
+    let attr_only = r#"{
+  "format_version": "1.2",
+  "planned_values": { "root_module": {} },
+  "resource_changes": [{
+    "address": "aws_s3_bucket_logging.data",
+    "mode": "managed",
+    "type": "aws_s3_bucket_logging",
+    "name": "data",
+    "change": {
+      "actions": ["create"],
+      "after": {
+        "bucket": "logs",
+        "target_bucket": "logs",
+        "depends_on": ["aws_s3_bucket.data"]
+      }
+    }
+  }, {
+    "address": "aws_s3_bucket.data",
+    "mode": "managed",
+    "type": "aws_s3_bucket",
+    "name": "data",
+    "change": { "actions": ["create"], "after": { "bucket": "data" } }
+  }]
+}"#;
+    let output = parse_plan_with_scope(
+        Path::new("dep-attr.tfplan.json"),
+        attr_only,
+        PlanScope::Changes,
+    );
+    assert!(
+        output.edges.iter().any(|e| e.kind == EdgeKind::DependsOn),
+        "edges={:?}",
+        output.edges
+    );
+
+    let config_only = r#"{
+  "format_version": "1.2",
+  "planned_values": { "root_module": {} },
+  "resource_changes": [
+    {
+      "address": "aws_s3_bucket_logging.data",
+      "mode": "managed",
+      "type": "aws_s3_bucket_logging",
+      "name": "data",
+      "change": { "actions": ["create"], "after": { "bucket": "logs", "target_bucket": "logs" } }
+    },
+    {
+      "address": "aws_s3_bucket.data",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "data",
+      "change": { "actions": ["create"], "after": { "bucket": "data" } }
+    }
+  ],
+  "configuration": {
+    "root_module": {
+      "resources": [{
+        "address": "aws_s3_bucket_logging.data",
+        "mode": "managed",
+        "type": "aws_s3_bucket_logging",
+        "name": "data",
+        "depends_on": ["aws_s3_bucket.data"],
+        "expressions": {}
+      }]
+    }
+  }
+}"#;
+    let output = parse_plan_with_scope(
+        Path::new("dep-cfg.tfplan.json"),
+        config_only,
+        PlanScope::Changes,
+    );
+    assert!(
+        output.edges.iter().any(|e| e.kind == EdgeKind::DependsOn),
+        "edges={:?}",
+        output.edges
+    );
+}
+
+#[test]
+fn changes_scope_child_module_reference_targets_prefixed_name() {
+    let source = r#"{
+  "format_version": "1.2",
+  "planned_values": { "root_module": {} },
+  "resource_changes": [
+    {
+      "address": "module.child.aws_s3_bucket.data",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "data",
+      "change": { "actions": ["create"], "after": { "bucket": "data" } }
+    },
+    {
+      "address": "module.child.aws_s3_bucket_logging.data",
+      "mode": "managed",
+      "type": "aws_s3_bucket_logging",
+      "name": "data",
+      "change": {
+        "actions": ["create"],
+        "after": { "bucket": "module.child.aws_s3_bucket.data.id", "target_bucket": "t" }
+      }
+    }
+  ]
+}"#;
+    let output = parse_plan_with_scope(
+        Path::new("childref.tfplan.json"),
+        source,
+        PlanScope::Changes,
+    );
+    assert_eq!(output.edges.len(), 1);
+    assert_eq!(output.edges[0].to.name, "module.child.data");
+}
+
+#[test]
+fn changes_scope_skips_no_op_logging_reference() {
+    let source = r#"{
+  "format_version": "1.2",
+  "planned_values": {
+    "root_module": {
+      "resources": [{
+        "address": "aws_s3_bucket_logging.data",
+        "mode": "managed",
+        "type": "aws_s3_bucket_logging",
+        "name": "data",
+        "values": { "bucket": "aws_s3_bucket.data", "target_bucket": "t" }
+      }]
+    }
+  },
+  "resource_changes": [
+    {
+      "address": "aws_s3_bucket_logging.data",
+      "change": { "actions": ["no-op"], "after": { "bucket": "aws_s3_bucket.data" } }
+    },
+    {
+      "address": "aws_s3_bucket.data",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "data",
+      "change": { "actions": ["create"], "after": { "bucket": "data" } }
+    }
+  ]
+}"#;
+    let output = parse_plan_with_scope(Path::new("noop.tfplan.json"), source, PlanScope::Changes);
+    assert!(output.edges.is_empty());
+}
+
+#[test]
+fn all_scope_includes_planned_only_logging_reference() {
+    let source = r#"{
+  "format_version": "1.2",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "aws_s3_bucket.data",
+          "mode": "managed",
+          "type": "aws_s3_bucket",
+          "name": "data",
+          "values": { "bucket": "data" }
+        },
+        {
+          "address": "aws_s3_bucket_logging.data",
+          "mode": "managed",
+          "type": "aws_s3_bucket_logging",
+          "name": "data",
+          "values": { "bucket": "aws_s3_bucket.data", "target_bucket": "t" }
+        }
+      ]
+    }
+  },
+  "resource_changes": [{
+    "address": "aws_s3_bucket.data",
+    "change": { "actions": ["create"], "after": { "bucket": "data" } }
+  }]
+}"#;
+    let all = parse_plan_with_scope(Path::new("all.tfplan.json"), source, PlanScope::All);
+    assert_eq!(all.edges.len(), 1);
+    let changes = parse_plan_with_scope(Path::new("all.tfplan.json"), source, PlanScope::Changes);
+    assert!(changes.edges.is_empty());
 }

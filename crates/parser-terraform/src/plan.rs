@@ -64,6 +64,7 @@ fn parse_plan_all(path: &Path, source: &str, parsed: &serde_json::Value) -> Pars
     let sensitive_by_address = sensitive_keys(parsed);
     let skips = skips_between(&extract_skip_comments(source), 1, usize::MAX);
     let mut output = ParseOutput::default();
+    let mut address_map = HashMap::new();
     walk_module(
         path,
         root_module,
@@ -71,7 +72,9 @@ fn parse_plan_all(path: &Path, source: &str, parsed: &serde_json::Value) -> Pars
         &sensitive_by_address,
         &skips,
         &mut output,
+        &mut address_map,
     );
+    attach_plan_edges(parsed, &mut output, &address_map);
     output
 }
 
@@ -102,6 +105,7 @@ fn parse_plan_changes(path: &Path, source: &str, parsed: &serde_json::Value) -> 
     let sensitive_by_address = sensitive_keys(parsed);
     let skips = skips_between(&extract_skip_comments(source), 1, usize::MAX);
     let mut output = ParseOutput::default();
+    let mut address_map = HashMap::new();
     for entry in changes {
         emit_resource_change(
             path,
@@ -110,8 +114,10 @@ fn parse_plan_changes(path: &Path, source: &str, parsed: &serde_json::Value) -> 
             &sensitive_by_address,
             &skips,
             &mut output,
+            &mut address_map,
         );
     }
+    attach_plan_edges(parsed, &mut output, &address_map);
     output
 }
 
@@ -152,6 +158,7 @@ fn emit_resource_change(
     sensitive_by_address: &HashMap<String, BTreeMap<String, bool>>,
     skips: &[rustmaninoff_ir::Skip],
     output: &mut ParseOutput,
+    address_map: &mut HashMap<String, ResourceRef>,
 ) {
     let actions = entry
         .get("change")
@@ -195,7 +202,7 @@ fn emit_resource_change(
         }
     }
     let from = ResourceRef::new(resource_type.clone(), name.clone()).with_file(path.to_path_buf());
-    collect_depends_on(output, &from, &attributes);
+    address_map.insert(address.to_string(), from.clone());
     output.resources.push(Resource {
         framework: Framework::TerraformPlan,
         kind,
@@ -398,6 +405,7 @@ fn walk_module(
     sensitive_by_address: &HashMap<String, BTreeMap<String, bool>>,
     skips: &[rustmaninoff_ir::Skip],
     output: &mut ParseOutput,
+    address_map: &mut HashMap<String, ResourceRef>,
 ) {
     if let Some(resources) = module.get("resources").and_then(|value| value.as_array()) {
         for entry in resources {
@@ -408,6 +416,7 @@ fn walk_module(
                 sensitive_by_address,
                 skips,
                 output,
+                address_map,
             );
         }
     }
@@ -423,6 +432,7 @@ fn walk_module(
                 sensitive_by_address,
                 skips,
                 output,
+                address_map,
             );
         }
     }
@@ -435,6 +445,7 @@ fn emit_resource(
     sensitive_by_address: &HashMap<String, BTreeMap<String, bool>>,
     skips: &[rustmaninoff_ir::Skip],
     output: &mut ParseOutput,
+    address_map: &mut HashMap<String, ResourceRef>,
 ) {
     let address = match entry.get("address").and_then(|value| value.as_str()) {
         Some(value) => value,
@@ -476,7 +487,7 @@ fn emit_resource(
         }
     }
     let from = ResourceRef::new(resource_type.clone(), name.clone()).with_file(path.to_path_buf());
-    collect_depends_on(output, &from, &attributes);
+    address_map.insert(address.to_string(), from.clone());
     output.resources.push(Resource {
         framework: Framework::TerraformPlan,
         kind,
@@ -601,7 +612,74 @@ fn set_unknown_segments(value: &mut Value, segments: &[&str]) {
     }
 }
 
-fn collect_depends_on(output: &mut ParseOutput, from: &ResourceRef, attributes: &Value) {
+fn attach_plan_edges(
+    parsed: &serde_json::Value,
+    output: &mut ParseOutput,
+    address_map: &HashMap<String, ResourceRef>,
+) {
+    for from in address_map.values() {
+        let attributes = output
+            .resources
+            .iter()
+            .find(|r| ResourceRef::from_resource(r).matches(from))
+            .map(|r| r.attributes.clone());
+        let Some(attributes) = attributes else {
+            continue;
+        };
+        collect_attribute_depends_on(output, from, &attributes, address_map);
+        collect_attribute_references(output, from, &attributes, "", address_map);
+    }
+    if let Some(root) = parsed
+        .get("configuration")
+        .and_then(|value| value.get("root_module"))
+    {
+        walk_configuration_module(output, root, address_map);
+    }
+}
+
+fn resolve_plan_address<'a>(
+    candidate: &str,
+    address_map: &'a HashMap<String, ResourceRef>,
+) -> Option<&'a ResourceRef> {
+    let mut text = candidate;
+    loop {
+        if let Some(target) = address_map.get(text) {
+            return Some(target);
+        }
+        let dot = text.rfind('.')?;
+        text = &text[..dot];
+    }
+}
+
+fn push_plan_edge(
+    output: &mut ParseOutput,
+    from: &ResourceRef,
+    to: &ResourceRef,
+    kind: EdgeKind,
+    via: Option<String>,
+) {
+    if from.matches(to) {
+        return;
+    }
+    let duplicate = output.edges.iter().any(|edge| {
+        edge.from.matches(from) && edge.to.matches(to) && edge.kind == kind && edge.via == via
+    });
+    if duplicate {
+        return;
+    }
+    let mut edge = Edge::new(from.clone(), to.clone(), kind);
+    if let Some(path) = via {
+        edge = edge.via(path);
+    }
+    output.push_edge(edge);
+}
+
+fn collect_attribute_depends_on(
+    output: &mut ParseOutput,
+    from: &ResourceRef,
+    attributes: &Value,
+    address_map: &HashMap<String, ResourceRef>,
+) {
     let Some(Value::Array(items)) = attributes.get("depends_on") else {
         return;
     };
@@ -609,24 +687,115 @@ fn collect_depends_on(output: &mut ParseOutput, from: &ResourceRef, attributes: 
         let Some(text) = item.as_str() else {
             continue;
         };
-        if let Some(target) = resource_ref_from_address(text) {
-            output.push_edge(Edge::new(from.clone(), target, EdgeKind::DependsOn));
-        }
+        let Some(to) = resolve_plan_address(text, address_map) else {
+            continue;
+        };
+        push_plan_edge(output, from, to, EdgeKind::DependsOn, None);
     }
 }
 
-fn resource_ref_from_address(address: &str) -> Option<ResourceRef> {
-    let parts: Vec<&str> = address.split('.').collect();
-    if parts.len() < 2 {
-        return None;
+fn collect_attribute_references(
+    output: &mut ParseOutput,
+    from: &ResourceRef,
+    value: &Value,
+    path: &str,
+    address_map: &HashMap<String, ResourceRef>,
+) {
+    match value {
+        Value::String(text) if text != SENSITIVE_PLACEHOLDER => {
+            let Some(to) = resolve_plan_address(text, address_map) else {
+                return;
+            };
+            push_plan_edge(
+                output,
+                from,
+                to,
+                EdgeKind::References,
+                Some(path.to_string()),
+            );
+        }
+        Value::Object(map) => {
+            for (key, child) in map {
+                if path.is_empty() && key == "depends_on" {
+                    continue;
+                }
+                let child_path = if path.is_empty() {
+                    key.clone()
+                } else {
+                    format!("{path}.{key}")
+                };
+                collect_attribute_references(output, from, child, &child_path, address_map);
+            }
+        }
+        Value::Array(items) => {
+            for (index, child) in items.iter().enumerate() {
+                let child_path = if path.is_empty() {
+                    format!("[{index}]")
+                } else {
+                    format!("{path}[{index}]")
+                };
+                collect_attribute_references(output, from, child, &child_path, address_map);
+            }
+        }
+        Value::Unknown { .. } => {}
+        _ => {}
     }
-    if parts[0] == "data" && parts.len() >= 3 {
-        return Some(ResourceRef::new(format!("data.{}", parts[1]), parts[2]));
+}
+
+fn walk_configuration_module(
+    output: &mut ParseOutput,
+    module: &serde_json::Value,
+    address_map: &HashMap<String, ResourceRef>,
+) {
+    if let Some(resources) = module.get("resources").and_then(|value| value.as_array()) {
+        for entry in resources {
+            let Some(address) = entry.get("address").and_then(|value| value.as_str()) else {
+                continue;
+            };
+            let Some(from) = address_map.get(address) else {
+                continue;
+            };
+            if let Some(deps) = entry.get("depends_on").and_then(|value| value.as_array()) {
+                for dep in deps {
+                    let Some(text) = dep.as_str() else {
+                        continue;
+                    };
+                    let Some(to) = resolve_plan_address(text, address_map) else {
+                        continue;
+                    };
+                    push_plan_edge(output, from, to, EdgeKind::DependsOn, None);
+                }
+            }
+            if let Some(expressions) = entry.get("expressions").and_then(|value| value.as_object())
+            {
+                for (attr, expr) in expressions {
+                    let Some(refs) = expr.get("references").and_then(|value| value.as_array())
+                    else {
+                        continue;
+                    };
+                    for reference in refs {
+                        let Some(text) = reference.as_str() else {
+                            continue;
+                        };
+                        let Some(to) = resolve_plan_address(text, address_map) else {
+                            continue;
+                        };
+                        push_plan_edge(output, from, to, EdgeKind::References, Some(attr.clone()));
+                    }
+                }
+            }
+        }
     }
-    Some(ResourceRef::new(
-        parts[parts.len() - 2],
-        parts[parts.len() - 1],
-    ))
+    if let Some(calls) = module
+        .get("module_calls")
+        .and_then(|value| value.as_object())
+    {
+        for call in calls.values() {
+            if let Some(child) = call.get("module") {
+                walk_configuration_module(output, child, address_map);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
