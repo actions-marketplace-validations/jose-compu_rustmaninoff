@@ -175,6 +175,7 @@ resource "aws_ebs_volume" "bad" {
         sarif_file: None,
         junit_file: None,
         excluded: vec![".git".into()],
+        plan_scope: rustmaninoff_parser_terraform::PlanScope::Changes,
     };
     let result = scan(&request).expect("scan");
     assert_eq!(result.exit_code, 1);

@@ -332,6 +332,7 @@ fn write_failure_is_reported() {
             &link,
             &[rustmaninoff_ir::Framework::Terraform],
             &rustmaninoff_parser_terraform::EvalContext::default(),
+            rustmaninoff_parser_terraform::PlanScope::Changes,
         )
         .is_none());
     }

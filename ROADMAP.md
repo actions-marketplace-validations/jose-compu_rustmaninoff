@@ -1,6 +1,6 @@
 # Rustmaninoff roadmap
 
-Current release: **0.5.3**. This file is the queue for daily releases. Tick a box in the same commit that ships the work.
+Current release: **0.5.6**. This file is the queue for daily releases. Tick a box in the same commit that ships the work.
 
 Position, unchanged: Checkov-compatible CKV policies, one Rust binary, fast. Run it next to Trivy. Trivy keeps CVEs, image layers, and SBOMs. Rustmaninoff does not grow a vulnerability database ([#8](https://github.com/jose-compu/rustmaninoff/issues/8) is closed as out of scope).
 
@@ -78,14 +78,13 @@ Known engine limits that later boxes depend on:
 - A `starting_with` / substring match across command-array items is missing, which blocks `CKV_K8S_105` and `CKV_K8S_151`.
 - `CKV_K8S_95` is an approximation (a few exact `--request-timeout=` strings), not Checkov's duration grammar.
 - `CKV_K8S_34` does not mean what Checkov means (theirs is "Tiller is absent"; ours is secrets via `envFrom`).
-- Plan scans read `planned_values` for the whole post-apply state. `resource_changes` actions are not used as a filter ([#80](https://github.com/jose-compu/rustmaninoff/issues/80)).
-- Plan graph edges are `depends_on` only ([#81](https://github.com/jose-compu/rustmaninoff/issues/81)).
+- Default plan scans report resources the plan creates or updates (attributes from `change.after`); `--plan-scope all` keeps the whole `planned_values` walk ([#80](https://github.com/jose-compu/rustmaninoff/issues/80) shipped in 0.5.4).
+- Plan graph edges follow `depends_on` and address references, not resolved names that merely match ([#81](https://github.com/jose-compu/rustmaninoff/issues/81) shipped in 0.5.5).
 - SARIF relative paths and rule help links ship in 0.5.3 ([#84](https://github.com/jose-compu/rustmaninoff/issues/84)); GitHub Code Scanning can open matched files.
 - Local modules, `count`, and `for_each` are not expanded ([#17](https://github.com/jose-compu/rustmaninoff/issues/17)). Resolved interpolations do not become graph edges ([#19](https://github.com/jose-compu/rustmaninoff/issues/19)).
 - There is no Helm or Kustomize framework ([#3](https://github.com/jose-compu/rustmaninoff/issues/3)). `Framework::parse("helm")` is `None`.
 - There is no baseline file ([#58](https://github.com/jose-compu/rustmaninoff/issues/58)).
 - There is no `SECURITY.md`, no `rust-version` field, and no Windows target. CI uses `dtolnay/rust-toolchain@stable`. The README build line says Rust 1.95 or newer.
-- Workspace `homepage` equals `repository`, and `[workspace.package] readme` is unused. `cargo test` warns. 0.5.1 is already published with those fields ([#85](https://github.com/jose-compu/rustmaninoff/issues/85)).
 
 ## Next patch
 
@@ -102,9 +101,9 @@ Each box is one patch unless the text says it is the minor closer. The [next pat
 Goal: a plan scan reports resources that the plan is creating or updating, graph checks run when the plan still shows the relationship, and GitHub code scanning can open the file. Sensitive redaction stays as 0.5.1 left it. Required for 1.0.
 
 - [x] SARIF locations are relative to the scan root, with forward slashes and `uriBaseId` `%SRCROOT%`. The message stays the check name. Set `informationUri` to `https://github.com/jose-compu/rustmaninoff`. Fixture: an absolute path under the scan root ([#84](https://github.com/jose-compu/rustmaninoff/issues/84)). Shipped in 0.5.3.
-- [ ] `terraform_plan` reads attributes from `resource_changes[].change.after`. Default actions are `create` and `update` (including replace). Skip `no-op`, `read`, and pure `delete`. `--plan-scope all` keeps today's whole-state behavior. Unknown leaves stay unknown ([#80](https://github.com/jose-compu/rustmaninoff/issues/80)).
-- [ ] Emit plan edges for `depends_on` and for planned values that are another resource address. Run the existing `CKV2_*` pass on those resources. Do not invent an edge from a name that merely matches ([#81](https://github.com/jose-compu/rustmaninoff/issues/81)).
-- [ ] Add the plan fixtures from [#82](https://github.com/jose-compu/rustmaninoff/issues/82) (managed resource, data source, child-module address, `after_unknown`, delete versus create once the scope box is done, sensitive redaction) and a plan section in `docs/fidelity.md`.
+- [x] `terraform_plan` reads attributes from `resource_changes[].change.after`. Default actions are `create` and `update` (including replace). Skip `no-op`, `read`, and pure `delete`. `--plan-scope all` keeps today's whole-state behavior. Unknown leaves stay unknown ([#80](https://github.com/jose-compu/rustmaninoff/issues/80)). Shipped in 0.5.4.
+- [x] Emit plan edges for `depends_on` and for planned values that are another resource address. Run the existing `CKV2_*` pass on those resources. Do not invent an edge from a name that merely matches ([#81](https://github.com/jose-compu/rustmaninoff/issues/81)). Shipped in 0.5.5.
+- [x] Add the plan fixtures from [#82](https://github.com/jose-compu/rustmaninoff/issues/82) (managed resource, data source, child-module address, `after_unknown`, delete versus create, sensitive redaction) and a plan section in `docs/fidelity.md`. Shipped in 0.5.6.
 - [ ] Copy the plan workflow from [ACTION.md](ACTION.md) into the README Action section. State that a default directory scan does not pick up plan files. Close [#83](https://github.com/jose-compu/rustmaninoff/issues/83) when both docs and the dogfood workflow agree.
 - [ ] Minor closer: the five boxes above are ticked, `cargo test --workspace` is green, and a plan with one new public bucket and one unchanged public bucket fails only the new bucket.
 
@@ -367,7 +366,7 @@ Tag `1.0.0` when every line below is true. Milestones marked as not blocking 1.0
 
 Any of these can ship on a day when the next milestone box is a one-check port that turns out to be blocked, or alongside a patch if it is a single-file fix. Do not let the backlog jump the queue when the next milestone box is ready.
 
-- [ ] On the next version bump, clear the Cargo warnings in [#85](https://github.com/jose-compu/rustmaninoff/issues/85): drop unused workspace `readme` (keep the CLI readme), point workspace `homepage` at `https://jose-compu.github.io/rustmaninoff/`. 0.5.1 is already on crates.io with the old fields, so this waits for the next publish.
+- [x] On the next version bump, clear the Cargo warnings in [#85](https://github.com/jose-compu/rustmaninoff/issues/85): drop unused workspace `readme` (keep the CLI readme), point workspace `homepage` at `https://jose-compu.github.io/rustmaninoff/`. Shipped in 0.5.4.
 - [ ] `CKV_K8S_95`: match Checkov's duration grammar, or narrow the fidelity note if the approximation is the intended behavior. One patch.
 - [ ] Each Checkov-compare disagreement: fix the check, or add one row to the divergence table. One disagreement per patch.
 - [ ] False positives reported against a published CKV id: one id per patch, with a fixture that used to fail and now passes.

@@ -11,7 +11,20 @@ use rustmaninoff_ir::{
 /// Stable placeholder for Terraform-marked sensitive plan attributes.
 pub const SENSITIVE_PLACEHOLDER: &str = "(sensitive value)";
 
+/// Which Terraform plan resources to materialize for scanning.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlanScope {
+    /// Create, update, and replace only. Attributes from `change.after`.
+    Changes,
+    /// Whole `planned_values` walk. Attributes from `values`.
+    All,
+}
+
 pub fn parse_plan(path: &Path, source: &str) -> ParseOutput {
+    parse_plan_with_scope(path, source, PlanScope::All)
+}
+
+pub fn parse_plan_with_scope(path: &Path, source: &str, scope: PlanScope) -> ParseOutput {
     let parsed: serde_json::Value = match serde_json::from_str(source) {
         Ok(value) => value,
         Err(err) => {
@@ -26,6 +39,13 @@ pub fn parse_plan(path: &Path, source: &str) -> ParseOutput {
             };
         }
     };
+    match scope {
+        PlanScope::All => parse_plan_all(path, source, &parsed),
+        PlanScope::Changes => parse_plan_changes(path, source, &parsed),
+    }
+}
+
+fn parse_plan_all(path: &Path, source: &str, parsed: &serde_json::Value) -> ParseOutput {
     let Some(root_module) = parsed
         .get("planned_values")
         .and_then(|value| value.get("root_module"))
@@ -40,10 +60,11 @@ pub fn parse_plan(path: &Path, source: &str) -> ParseOutput {
             edges: Vec::new(),
         };
     };
-    let unknown_by_address = unknown_keys(&parsed);
-    let sensitive_by_address = sensitive_keys(&parsed);
+    let unknown_by_address = unknown_keys(parsed);
+    let sensitive_by_address = sensitive_keys(parsed);
     let skips = skips_between(&extract_skip_comments(source), 1, usize::MAX);
     let mut output = ParseOutput::default();
+    let mut address_map = HashMap::new();
     walk_module(
         path,
         root_module,
@@ -51,8 +72,148 @@ pub fn parse_plan(path: &Path, source: &str) -> ParseOutput {
         &sensitive_by_address,
         &skips,
         &mut output,
+        &mut address_map,
     );
+    attach_plan_edges(parsed, &mut output, &address_map);
     output
+}
+
+fn parse_plan_changes(path: &Path, source: &str, parsed: &serde_json::Value) -> ParseOutput {
+    let has_root = parsed
+        .get("planned_values")
+        .and_then(|value| value.get("root_module"))
+        .is_some();
+    let changes_key = parsed.get("resource_changes");
+    if changes_key.is_none() && !has_root {
+        return ParseOutput {
+            diagnostics: vec![rustmaninoff_ir::Diagnostic {
+                file: path.to_path_buf(),
+                line: 1,
+                message: "missing planned_values.root_module".to_string(),
+            }],
+            resources: Vec::new(),
+            edges: Vec::new(),
+        };
+    }
+    let Some(changes) = changes_key.and_then(|value| value.as_array()) else {
+        return ParseOutput::default();
+    };
+    if changes.is_empty() {
+        return ParseOutput::default();
+    }
+    let unknown_by_address = unknown_keys(parsed);
+    let sensitive_by_address = sensitive_keys(parsed);
+    let skips = skips_between(&extract_skip_comments(source), 1, usize::MAX);
+    let mut output = ParseOutput::default();
+    let mut address_map = HashMap::new();
+    for entry in changes {
+        emit_resource_change(
+            path,
+            entry,
+            &unknown_by_address,
+            &sensitive_by_address,
+            &skips,
+            &mut output,
+            &mut address_map,
+        );
+    }
+    attach_plan_edges(parsed, &mut output, &address_map);
+    output
+}
+
+fn resource_identity<'a>(
+    entry: &'a serde_json::Value,
+    address: &'a str,
+) -> Option<(&'a str, &'a str, &'a str)> {
+    if let (Some(type_name), Some(short_name)) = (
+        entry.get("type").and_then(|value| value.as_str()),
+        entry.get("name").and_then(|value| value.as_str()),
+    ) {
+        let mode = entry
+            .get("mode")
+            .and_then(|value| value.as_str())
+            .unwrap_or("managed");
+        return Some((mode, type_name, short_name));
+    }
+    let parts: Vec<&str> = address.split('.').collect();
+    if parts.len() >= 3 && parts[0] == "data" {
+        return Some(("data", parts[1], parts[2]));
+    }
+    if parts.len() >= 2 {
+        return Some(("managed", parts[parts.len() - 2], parts[parts.len() - 1]));
+    }
+    None
+}
+
+fn change_in_scope(actions: &[serde_json::Value]) -> bool {
+    actions
+        .iter()
+        .any(|action| matches!(action.as_str(), Some("create") | Some("update")))
+}
+
+fn emit_resource_change(
+    path: &Path,
+    entry: &serde_json::Value,
+    unknown_by_address: &HashMap<String, BTreeMap<String, bool>>,
+    sensitive_by_address: &HashMap<String, BTreeMap<String, bool>>,
+    skips: &[rustmaninoff_ir::Skip],
+    output: &mut ParseOutput,
+    address_map: &mut HashMap<String, ResourceRef>,
+) {
+    let actions = entry
+        .get("change")
+        .and_then(|value| value.get("actions"))
+        .and_then(|value| value.as_array())
+        .map(|items| items.as_slice())
+        .unwrap_or(&[]);
+    if !change_in_scope(actions) {
+        return;
+    }
+    let address = match entry.get("address").and_then(|value| value.as_str()) {
+        Some(value) => value,
+        None => return,
+    };
+    let (mode, type_name, short_name) = match resource_identity(entry, address) {
+        Some(value) => value,
+        None => return,
+    };
+    let (kind, resource_type) = match mode {
+        "data" => (ResourceKind::Data, format!("data.{type_name}")),
+        _ => (ResourceKind::Managed, type_name.to_string()),
+    };
+    let name = prefixed_name(address, type_name, short_name);
+    let after = entry.get("change").and_then(|value| value.get("after"));
+    let mut attributes = match after {
+        Some(value) if !value.is_null() => json_to_value(value),
+        _ => Value::Object(BTreeMap::new()),
+    };
+    if let Some(flags) = unknown_by_address.get(address) {
+        for path in flags.keys() {
+            if flags.get(path) == Some(&true) {
+                set_unknown_path(&mut attributes, path);
+            }
+        }
+    }
+    if let Some(flags) = sensitive_by_address.get(address) {
+        for path in flags.keys() {
+            if flags.get(path) == Some(&true) {
+                set_redacted_path(&mut attributes, path);
+            }
+        }
+    }
+    let from = ResourceRef::new(resource_type.clone(), name.clone()).with_file(path.to_path_buf());
+    address_map.insert(address.to_string(), from.clone());
+    output.resources.push(Resource {
+        framework: Framework::TerraformPlan,
+        kind,
+        resource_type,
+        name,
+        attributes,
+        file: path.to_path_buf(),
+        start_line: 1,
+        end_line: 1,
+        skips: skips.to_vec(),
+    });
 }
 
 fn unknown_keys(plan: &serde_json::Value) -> HashMap<String, BTreeMap<String, bool>> {
@@ -244,6 +405,7 @@ fn walk_module(
     sensitive_by_address: &HashMap<String, BTreeMap<String, bool>>,
     skips: &[rustmaninoff_ir::Skip],
     output: &mut ParseOutput,
+    address_map: &mut HashMap<String, ResourceRef>,
 ) {
     if let Some(resources) = module.get("resources").and_then(|value| value.as_array()) {
         for entry in resources {
@@ -254,6 +416,7 @@ fn walk_module(
                 sensitive_by_address,
                 skips,
                 output,
+                address_map,
             );
         }
     }
@@ -269,6 +432,7 @@ fn walk_module(
                 sensitive_by_address,
                 skips,
                 output,
+                address_map,
             );
         }
     }
@@ -281,6 +445,7 @@ fn emit_resource(
     sensitive_by_address: &HashMap<String, BTreeMap<String, bool>>,
     skips: &[rustmaninoff_ir::Skip],
     output: &mut ParseOutput,
+    address_map: &mut HashMap<String, ResourceRef>,
 ) {
     let address = match entry.get("address").and_then(|value| value.as_str()) {
         Some(value) => value,
@@ -322,7 +487,7 @@ fn emit_resource(
         }
     }
     let from = ResourceRef::new(resource_type.clone(), name.clone()).with_file(path.to_path_buf());
-    collect_depends_on(output, &from, &attributes);
+    address_map.insert(address.to_string(), from.clone());
     output.resources.push(Resource {
         framework: Framework::TerraformPlan,
         kind,
@@ -447,7 +612,74 @@ fn set_unknown_segments(value: &mut Value, segments: &[&str]) {
     }
 }
 
-fn collect_depends_on(output: &mut ParseOutput, from: &ResourceRef, attributes: &Value) {
+fn attach_plan_edges(
+    parsed: &serde_json::Value,
+    output: &mut ParseOutput,
+    address_map: &HashMap<String, ResourceRef>,
+) {
+    for from in address_map.values() {
+        let attributes = output
+            .resources
+            .iter()
+            .find(|r| ResourceRef::from_resource(r).matches(from))
+            .map(|r| r.attributes.clone());
+        let Some(attributes) = attributes else {
+            continue;
+        };
+        collect_attribute_depends_on(output, from, &attributes, address_map);
+        collect_attribute_references(output, from, &attributes, "", address_map);
+    }
+    if let Some(root) = parsed
+        .get("configuration")
+        .and_then(|value| value.get("root_module"))
+    {
+        walk_configuration_module(output, root, address_map);
+    }
+}
+
+fn resolve_plan_address<'a>(
+    candidate: &str,
+    address_map: &'a HashMap<String, ResourceRef>,
+) -> Option<&'a ResourceRef> {
+    let mut text = candidate;
+    loop {
+        if let Some(target) = address_map.get(text) {
+            return Some(target);
+        }
+        let dot = text.rfind('.')?;
+        text = &text[..dot];
+    }
+}
+
+fn push_plan_edge(
+    output: &mut ParseOutput,
+    from: &ResourceRef,
+    to: &ResourceRef,
+    kind: EdgeKind,
+    via: Option<String>,
+) {
+    if from.matches(to) {
+        return;
+    }
+    let duplicate = output.edges.iter().any(|edge| {
+        edge.from.matches(from) && edge.to.matches(to) && edge.kind == kind && edge.via == via
+    });
+    if duplicate {
+        return;
+    }
+    let mut edge = Edge::new(from.clone(), to.clone(), kind);
+    if let Some(path) = via {
+        edge = edge.via(path);
+    }
+    output.push_edge(edge);
+}
+
+fn collect_attribute_depends_on(
+    output: &mut ParseOutput,
+    from: &ResourceRef,
+    attributes: &Value,
+    address_map: &HashMap<String, ResourceRef>,
+) {
     let Some(Value::Array(items)) = attributes.get("depends_on") else {
         return;
     };
@@ -455,24 +687,115 @@ fn collect_depends_on(output: &mut ParseOutput, from: &ResourceRef, attributes: 
         let Some(text) = item.as_str() else {
             continue;
         };
-        if let Some(target) = resource_ref_from_address(text) {
-            output.push_edge(Edge::new(from.clone(), target, EdgeKind::DependsOn));
-        }
+        let Some(to) = resolve_plan_address(text, address_map) else {
+            continue;
+        };
+        push_plan_edge(output, from, to, EdgeKind::DependsOn, None);
     }
 }
 
-fn resource_ref_from_address(address: &str) -> Option<ResourceRef> {
-    let parts: Vec<&str> = address.split('.').collect();
-    if parts.len() < 2 {
-        return None;
+fn collect_attribute_references(
+    output: &mut ParseOutput,
+    from: &ResourceRef,
+    value: &Value,
+    path: &str,
+    address_map: &HashMap<String, ResourceRef>,
+) {
+    match value {
+        Value::String(text) if text != SENSITIVE_PLACEHOLDER => {
+            let Some(to) = resolve_plan_address(text, address_map) else {
+                return;
+            };
+            push_plan_edge(
+                output,
+                from,
+                to,
+                EdgeKind::References,
+                Some(path.to_string()),
+            );
+        }
+        Value::Object(map) => {
+            for (key, child) in map {
+                if path.is_empty() && key == "depends_on" {
+                    continue;
+                }
+                let child_path = if path.is_empty() {
+                    key.clone()
+                } else {
+                    format!("{path}.{key}")
+                };
+                collect_attribute_references(output, from, child, &child_path, address_map);
+            }
+        }
+        Value::Array(items) => {
+            for (index, child) in items.iter().enumerate() {
+                let child_path = if path.is_empty() {
+                    format!("[{index}]")
+                } else {
+                    format!("{path}[{index}]")
+                };
+                collect_attribute_references(output, from, child, &child_path, address_map);
+            }
+        }
+        Value::Unknown { .. } => {}
+        _ => {}
     }
-    if parts[0] == "data" && parts.len() >= 3 {
-        return Some(ResourceRef::new(format!("data.{}", parts[1]), parts[2]));
+}
+
+fn walk_configuration_module(
+    output: &mut ParseOutput,
+    module: &serde_json::Value,
+    address_map: &HashMap<String, ResourceRef>,
+) {
+    if let Some(resources) = module.get("resources").and_then(|value| value.as_array()) {
+        for entry in resources {
+            let Some(address) = entry.get("address").and_then(|value| value.as_str()) else {
+                continue;
+            };
+            let Some(from) = address_map.get(address) else {
+                continue;
+            };
+            if let Some(deps) = entry.get("depends_on").and_then(|value| value.as_array()) {
+                for dep in deps {
+                    let Some(text) = dep.as_str() else {
+                        continue;
+                    };
+                    let Some(to) = resolve_plan_address(text, address_map) else {
+                        continue;
+                    };
+                    push_plan_edge(output, from, to, EdgeKind::DependsOn, None);
+                }
+            }
+            if let Some(expressions) = entry.get("expressions").and_then(|value| value.as_object())
+            {
+                for (attr, expr) in expressions {
+                    let Some(refs) = expr.get("references").and_then(|value| value.as_array())
+                    else {
+                        continue;
+                    };
+                    for reference in refs {
+                        let Some(text) = reference.as_str() else {
+                            continue;
+                        };
+                        let Some(to) = resolve_plan_address(text, address_map) else {
+                            continue;
+                        };
+                        push_plan_edge(output, from, to, EdgeKind::References, Some(attr.clone()));
+                    }
+                }
+            }
+        }
     }
-    Some(ResourceRef::new(
-        parts[parts.len() - 2],
-        parts[parts.len() - 1],
-    ))
+    if let Some(calls) = module
+        .get("module_calls")
+        .and_then(|value| value.as_object())
+    {
+        for call in calls.values() {
+            if let Some(child) = call.get("module") {
+                walk_configuration_module(output, child, address_map);
+            }
+        }
+    }
 }
 
 #[cfg(test)]

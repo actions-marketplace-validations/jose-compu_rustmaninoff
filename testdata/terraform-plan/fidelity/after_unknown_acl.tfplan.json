@@ -1,0 +1,35 @@
+{
+  "format_version": "1.2",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "aws_s3_bucket.pending",
+          "mode": "managed",
+          "type": "aws_s3_bucket",
+          "name": "pending",
+          "values": {
+            "bucket": "data"
+          }
+        }
+      ]
+    }
+  },
+  "resource_changes": [
+    {
+      "address": "aws_s3_bucket.pending",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "pending",
+      "change": {
+        "actions": ["create"],
+        "after": {
+          "bucket": "data"
+        },
+        "after_unknown": {
+          "acl": true
+        }
+      }
+    }
+  ]
+}

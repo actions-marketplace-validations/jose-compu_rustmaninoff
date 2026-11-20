@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.5.6 — 2026-11-20
+
+- `docs/fidelity.md` documents what an opt-in Terraform plan scan covers; `scripts/coverage_inventory.py` keeps that section on refresh.
+- Committed plan JSON fixtures back each claim; parser tests load those files. Parser behavior unchanged.
+- Built-in catalog remains **541** checks. Workspace crates and Action default `version` are **0.5.6**.
+
+## 0.5.5 — 2026-11-19
+
+### Added
+
+- Terraform plan scans follow explicit `depends_on` links and attribute or configuration references whose value is another resource address in the plan (including `configuration` references after Terraform resolves a value to a name). Companion `CKV2_*` checks run on those edges ([#81](https://github.com/jose-compu/rustmaninoff/issues/81)).
+- A string that only matches another resource's name is not treated as a graph edge. Resources this apply does not create or update stay out of the default scan; `--plan-scope all` still includes them.
+
+### Changed
+
+- Unknown plan leaves still do not fail the process. Sensitive values stay redacted as `(sensitive value)`. The built-in catalog remains **541** checks.
+- Workspace crates and the Action default `version` pin are 0.5.5.
+
+## 0.5.4 — 2026-11-19
+
+### Fixed
+
+- Default `terraform_plan` scans report only resources this apply creates or updates (including replace). Attributes come from `resource_changes[].change.after`. Unchanged, read-only, and delete-only resources are skipped ([#80](https://github.com/jose-compu/rustmaninoff/issues/80)).
+- `--plan-scope all` keeps the previous whole-state plan scan (0.5.0 through 0.5.3 behavior).
+
+### Changed
+
+- Unknown plan leaves still do not fail the process. Sensitive values stay redacted as `(sensitive value)`.
+- Workspace `homepage` is the project site; unused workspace `readme` is removed so `cargo test` and publish no longer warn ([#85](https://github.com/jose-compu/rustmaninoff/issues/85)).
+- Workspace crates and the Action default `version` pin are 0.5.4.
+
 ## 0.5.3 — 2026-11-18
 
 ### Fixed
@@ -37,7 +68,6 @@
 ### Notes
 
 - This is not a secrets scanner: only provider-schema–marked sensitive values are redacted. Keep plan artifacts out of logs and CI output; unmarked values remain your pipeline’s responsibility.
-
 ## 0.5.0 — 2026-11-17
 
 ### Added

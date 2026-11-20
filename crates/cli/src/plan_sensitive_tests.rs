@@ -6,7 +6,7 @@ use std::path::Path;
 
 use rustmaninoff_engine::Status;
 use rustmaninoff_ir::{lookup, Framework};
-use rustmaninoff_parser_terraform::{parse_plan, SENSITIVE_PLACEHOLDER};
+use rustmaninoff_parser_terraform::{parse_plan, PlanScope, SENSITIVE_PLACEHOLDER};
 use rustmaninoff_report::{
     render_json, render_junit, render_sarif, render_text, RenderOptions, SarifOptions,
 };
@@ -100,6 +100,7 @@ pub(crate) fn sensitive_scan_request(path: std::path::PathBuf) -> ScanRequest {
         sarif_file: None,
         junit_file: None,
         excluded: vec![".git".into()],
+        plan_scope: PlanScope::Changes,
     }
 }
 

@@ -52,7 +52,24 @@ _None._
 | `CKV_K8S_34` | Checkov: Tiller not deployed. rustmaninoff: secrets via envFrom (closer to Checkov CKV_K8S_35 companion). |
 | Unknown interpolations | rustmaninoff never fails the process on `Unknown`; Checkov may guess or fail differently. |
 | Graph (`CKV2_*`) | First-wave AWS only; not full Checkov graph pack. |
-| Helm / plan JSON / secrets / CVE | Intentional product gaps (see ROADMAP). |
+| Helm / secrets / CVE | Intentional product gaps (see ROADMAP). |
+
+## Plan scan
+
+Opt-in `terraform_plan` runs the same check ids as the HCL path for resources the plan emits. The built-in catalog count is unchanged.
+
+| Fixture | Claim | Scope |
+| --- | --- | --- |
+| `testdata/terraform-plan/s3_public_fail.tfplan.json` | Created bucket with public ACL fails `CKV_AWS_20` | Default (`changes`: creates and updates) |
+| `testdata/terraform-plan/fidelity/managed_private_create.tfplan.json` | Created private bucket does not fail `CKV_AWS_20` | Default |
+| `testdata/terraform-plan/fidelity/data_ami.tfplan.json` | Data source has `data.` type prefix; omitted from default scope | Default skips; `--plan-scope all` includes |
+| `testdata/terraform-plan/fidelity/child_module_bucket.tfplan.json` | Child-module address keeps `module.<name>.<resource>` prefix | Default |
+| `testdata/terraform-plan/fidelity/after_unknown_acl.tfplan.json` | Unknown `acl` does not fail the check | Default |
+| `testdata/terraform-plan/fidelity/scope_actions.tfplan.json` | Default scope: only create and update; all scope: also no-op and read, not delete | Default vs `--plan-scope all` |
+| `testdata/terraform-plan/s3_public_fail_sensitive_tag.tfplan.json` | Sensitive leaves show `(sensitive value)`, not cleartext | Default |
+| `testdata/terraform-plan/s3_public_fail.tf` | Same `CKV_AWS_20` failure as the public plan fixture (locked by `plan_and_tf_twin_share_check_id`) | HCL path |
+
+**Not claimed:** registry and git Terraform modules; binary plan files (JSON only); Helm and Kustomize; a default directory scan picking up `*.tfplan.json`; inventing a graph link from a name that only matches another resource.
 
 ## Refresh
 

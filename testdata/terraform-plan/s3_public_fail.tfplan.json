@@ -16,5 +16,19 @@
       ]
     }
   },
-  "resource_changes": []
+  "resource_changes": [
+    {
+      "address": "aws_s3_bucket.bad",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "bad",
+      "change": {
+        "actions": ["create"],
+        "after": {
+          "bucket": "data",
+          "acl": "public-read"
+        }
+      }
+    }
+  ]
 }

@@ -86,6 +86,9 @@ pub struct ScanArgs {
     /// Print passed checks in the text report.
     #[arg(long)]
     pub show_passed: bool,
+    /// Terraform plan scan scope: `changes` (default) or `all`.
+    #[arg(long, default_value = "changes")]
+    pub plan_scope: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -124,6 +127,7 @@ pub struct ScanRequest {
     pub sarif_file: Option<PathBuf>,
     pub junit_file: Option<PathBuf>,
     pub excluded: Vec<String>,
+    pub plan_scope: rustmaninoff_parser_terraform::PlanScope,
 }
 
 pub struct ScanResult {
@@ -148,7 +152,9 @@ pub fn scan(request: &ScanRequest) -> anyhow::Result<ScanResult> {
     let tf_ctx = terraform_eval_context(request)?;
     let parsed: Vec<ParseOutput> = files
         .par_iter()
-        .filter_map(|path| classify_and_parse(path, &request.frameworks, &tf_ctx))
+        .filter_map(|path| {
+            classify_and_parse(path, &request.frameworks, &tf_ctx, request.plan_scope)
+        })
         .collect();
     let mut resources = Vec::new();
     let mut diagnostics = Vec::new();
@@ -226,6 +232,7 @@ fn request_from_args(args: ScanArgs) -> anyhow::Result<ScanRequest> {
     if let Some(config) = &config {
         excluded.extend(config.excluded_paths.clone());
     }
+    let plan_scope = parse_plan_scope(&args.plan_scope)?;
     Ok(ScanRequest {
         path,
         frameworks,
@@ -243,7 +250,18 @@ fn request_from_args(args: ScanArgs) -> anyhow::Result<ScanRequest> {
         sarif_file: args.sarif_file,
         junit_file: args.junit_file,
         excluded,
+        plan_scope,
     })
+}
+
+pub(crate) fn parse_plan_scope(
+    value: &str,
+) -> anyhow::Result<rustmaninoff_parser_terraform::PlanScope> {
+    match value {
+        "changes" => Ok(rustmaninoff_parser_terraform::PlanScope::Changes),
+        "all" => Ok(rustmaninoff_parser_terraform::PlanScope::All),
+        other => anyhow::bail!("unknown plan scope '{other}' (expected 'changes' or 'all')"),
+    }
 }
 
 fn terraform_eval_context(
@@ -370,6 +388,7 @@ fn classify_and_parse(
     path: &Path,
     frameworks: &[Framework],
     tf_ctx: &rustmaninoff_parser_terraform::EvalContext,
+    plan_scope: rustmaninoff_parser_terraform::PlanScope,
 ) -> Option<ParseOutput> {
     let meta = fs::symlink_metadata(path).ok()?;
     let file_type = meta.file_type();
@@ -394,7 +413,9 @@ fn classify_and_parse(
         Framework::Terraform => {
             rustmaninoff_parser_terraform::parse_file_with_context(path, &source, tf_ctx)
         }
-        Framework::TerraformPlan => rustmaninoff_parser_terraform::parse_plan(path, &source),
+        Framework::TerraformPlan => {
+            rustmaninoff_parser_terraform::parse_plan_with_scope(path, &source, plan_scope)
+        }
         Framework::CloudFormation => rustmaninoff_parser_cfn::parse_file(path, &source),
         Framework::Kubernetes => rustmaninoff_parser_k8s::parse_file(path, &source),
         Framework::Docker => rustmaninoff_parser_docker::parse_file(path, &source),
