@@ -1,0 +1,38 @@
+{
+  "format_version": "1.2",
+  "planned_values": {
+    "root_module": {
+      "child_modules": [
+        {
+          "resources": [
+            {
+              "address": "module.child.aws_s3_bucket.logs",
+              "mode": "managed",
+              "type": "aws_s3_bucket",
+              "name": "logs",
+              "values": {
+                "bucket": "logs",
+                "acl": "private"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "resource_changes": [
+    {
+      "address": "module.child.aws_s3_bucket.logs",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "logs",
+      "change": {
+        "actions": ["create"],
+        "after": {
+          "bucket": "logs",
+          "acl": "private"
+        }
+      }
+    }
+  ]
+}

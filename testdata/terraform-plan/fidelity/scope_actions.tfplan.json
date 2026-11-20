@@ -1,0 +1,116 @@
+{
+  "format_version": "1.2",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "aws_s3_bucket.to_create",
+          "mode": "managed",
+          "type": "aws_s3_bucket",
+          "name": "to_create",
+          "values": {
+            "bucket": "create",
+            "acl": "public-read"
+          }
+        },
+        {
+          "address": "aws_s3_bucket.to_update",
+          "mode": "managed",
+          "type": "aws_s3_bucket",
+          "name": "to_update",
+          "values": {
+            "bucket": "update",
+            "acl": "public-read"
+          }
+        },
+        {
+          "address": "aws_s3_bucket.noop",
+          "mode": "managed",
+          "type": "aws_s3_bucket",
+          "name": "noop",
+          "values": {
+            "bucket": "noop",
+            "acl": "public-read"
+          }
+        },
+        {
+          "address": "aws_s3_bucket.to_read",
+          "mode": "managed",
+          "type": "aws_s3_bucket",
+          "name": "to_read",
+          "values": {
+            "bucket": "read",
+            "acl": "public-read"
+          }
+        }
+      ]
+    }
+  },
+  "resource_changes": [
+    {
+      "address": "aws_s3_bucket.to_create",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "to_create",
+      "change": {
+        "actions": ["create"],
+        "after": {
+          "bucket": "create",
+          "acl": "public-read"
+        }
+      }
+    },
+    {
+      "address": "aws_s3_bucket.to_update",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "to_update",
+      "change": {
+        "actions": ["update"],
+        "after": {
+          "bucket": "update",
+          "acl": "public-read"
+        }
+      }
+    },
+    {
+      "address": "aws_s3_bucket.noop",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "noop",
+      "change": {
+        "actions": ["no-op"],
+        "after": {
+          "bucket": "noop",
+          "acl": "public-read"
+        }
+      }
+    },
+    {
+      "address": "aws_s3_bucket.to_read",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "to_read",
+      "change": {
+        "actions": ["read"],
+        "after": {
+          "bucket": "read",
+          "acl": "public-read"
+        }
+      }
+    },
+    {
+      "address": "aws_s3_bucket.to_delete",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "to_delete",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "bucket": "delete",
+          "acl": "public-read"
+        }
+      }
+    }
+  ]
+}

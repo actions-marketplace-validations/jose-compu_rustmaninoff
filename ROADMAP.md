@@ -1,6 +1,6 @@
 # Rustmaninoff roadmap
 
-Current release: **0.5.5**. This file is the queue for daily releases. Tick a box in the same commit that ships the work.
+Current release: **0.5.6**. This file is the queue for daily releases. Tick a box in the same commit that ships the work.
 
 Position, unchanged: Checkov-compatible CKV policies, one Rust binary, fast. Run it next to Trivy. Trivy keeps CVEs, image layers, and SBOMs. Rustmaninoff does not grow a vulnerability database ([#8](https://github.com/jose-compu/rustmaninoff/issues/8) is closed as out of scope).
 
@@ -103,7 +103,7 @@ Goal: a plan scan reports resources that the plan is creating or updating, graph
 - [x] SARIF locations are relative to the scan root, with forward slashes and `uriBaseId` `%SRCROOT%`. The message stays the check name. Set `informationUri` to `https://github.com/jose-compu/rustmaninoff`. Fixture: an absolute path under the scan root ([#84](https://github.com/jose-compu/rustmaninoff/issues/84)). Shipped in 0.5.3.
 - [x] `terraform_plan` reads attributes from `resource_changes[].change.after`. Default actions are `create` and `update` (including replace). Skip `no-op`, `read`, and pure `delete`. `--plan-scope all` keeps today's whole-state behavior. Unknown leaves stay unknown ([#80](https://github.com/jose-compu/rustmaninoff/issues/80)). Shipped in 0.5.4.
 - [x] Emit plan edges for `depends_on` and for planned values that are another resource address. Run the existing `CKV2_*` pass on those resources. Do not invent an edge from a name that merely matches ([#81](https://github.com/jose-compu/rustmaninoff/issues/81)). Shipped in 0.5.5.
-- [ ] Add the plan fixtures from [#82](https://github.com/jose-compu/rustmaninoff/issues/82) (managed resource, data source, child-module address, `after_unknown`, delete versus create once the scope box is done, sensitive redaction) and a plan section in `docs/fidelity.md`.
+- [x] Add the plan fixtures from [#82](https://github.com/jose-compu/rustmaninoff/issues/82) (managed resource, data source, child-module address, `after_unknown`, delete versus create, sensitive redaction) and a plan section in `docs/fidelity.md`. Shipped in 0.5.6.
 - [ ] Copy the plan workflow from [ACTION.md](ACTION.md) into the README Action section. State that a default directory scan does not pick up plan files. Close [#83](https://github.com/jose-compu/rustmaninoff/issues/83) when both docs and the dogfood workflow agree.
 - [ ] Minor closer: the five boxes above are ticked, `cargo test --workspace` is green, and a plan with one new public bucket and one unchanged public bucket fails only the new bucket.
 

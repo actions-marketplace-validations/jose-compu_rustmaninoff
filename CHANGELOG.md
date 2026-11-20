@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.6 — 2026-11-20
+
+- `docs/fidelity.md` documents what an opt-in Terraform plan scan covers; `scripts/coverage_inventory.py` keeps that section on refresh.
+- Committed plan JSON fixtures back each claim; parser tests load those files. Parser behavior unchanged.
+- Built-in catalog remains **541** checks. Workspace crates and Action default `version` are **0.5.6**.
+
 ## 0.5.5 — 2026-11-19
 
 ### Added
