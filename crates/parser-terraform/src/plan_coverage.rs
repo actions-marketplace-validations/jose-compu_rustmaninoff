@@ -1,4 +1,5 @@
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use rustmaninoff_engine::{evaluate, parse_policy, Status};
 use rustmaninoff_ir::{EdgeKind, ResourceKind};
@@ -773,4 +774,113 @@ fn all_scope_includes_planned_only_logging_reference() {
     assert_eq!(all.edges.len(), 1);
     let changes = parse_plan_with_scope(Path::new("all.tfplan.json"), source, PlanScope::Changes);
     assert!(changes.edges.is_empty());
+}
+
+fn plan_testdata_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata/terraform-plan")
+}
+
+fn read_plan_fixture(rel: &str) -> String {
+    fs::read_to_string(plan_testdata_root().join(rel)).unwrap_or_else(|e| panic!("{rel}: {e}"))
+}
+
+fn ckv_aws_20_policy() -> rustmaninoff_engine::Policy {
+    parse_policy(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../cli/policies/terraform/CKV_AWS_20.yaml"
+    )))
+    .expect("policy")
+}
+
+#[test]
+fn published_fidelity_fixtures() {
+    let policy = ckv_aws_20_policy();
+
+    let public_fail = read_plan_fixture("s3_public_fail.tfplan.json");
+    let output = parse_plan_with_scope(
+        Path::new("s3_public_fail.tfplan.json"),
+        &public_fail,
+        PlanScope::Changes,
+    );
+    let findings = evaluate(&output.resources, std::slice::from_ref(&policy));
+    assert!(findings.iter().any(|f| f.status == Status::Failed));
+    assert_eq!(output.resources.len(), 1);
+    assert_eq!(output.resources[0].name, "bad");
+
+    let private_create = read_plan_fixture("fidelity/managed_private_create.tfplan.json");
+    let output = parse_plan_with_scope(
+        Path::new("managed_private_create.tfplan.json"),
+        &private_create,
+        PlanScope::Changes,
+    );
+    assert_eq!(output.resources.len(), 1);
+    let findings = evaluate(&output.resources, std::slice::from_ref(&policy));
+    assert!(!findings.iter().any(|f| f.status == Status::Failed));
+
+    let data_ami = read_plan_fixture("fidelity/data_ami.tfplan.json");
+    let all = parse_plan_with_scope(Path::new("data_ami.tfplan.json"), &data_ami, PlanScope::All);
+    assert_eq!(all.resources.len(), 1);
+    assert_eq!(all.resources[0].kind, ResourceKind::Data);
+    assert_eq!(all.resources[0].resource_type, "data.aws_ami");
+    let changes = parse_plan_with_scope(
+        Path::new("data_ami.tfplan.json"),
+        &data_ami,
+        PlanScope::Changes,
+    );
+    assert!(changes.resources.is_empty());
+
+    let child = read_plan_fixture("fidelity/child_module_bucket.tfplan.json");
+    let output = parse_plan_with_scope(
+        Path::new("child_module_bucket.tfplan.json"),
+        &child,
+        PlanScope::Changes,
+    );
+    assert_eq!(output.resources.len(), 1);
+    assert_eq!(output.resources[0].name, "module.child.logs");
+
+    let unknown_acl = read_plan_fixture("fidelity/after_unknown_acl.tfplan.json");
+    let output = parse_plan_with_scope(
+        Path::new("after_unknown_acl.tfplan.json"),
+        &unknown_acl,
+        PlanScope::Changes,
+    );
+    let acl = rustmaninoff_ir::lookup(&output.resources[0].attributes, "acl");
+    assert!(acl.unknown);
+    let findings = evaluate(&output.resources, std::slice::from_ref(&policy));
+    assert!(!findings.iter().any(|f| f.status == Status::Failed));
+    assert!(output.diagnostics.is_empty());
+
+    let scope_actions = read_plan_fixture("fidelity/scope_actions.tfplan.json");
+    let changes = parse_plan_with_scope(
+        Path::new("scope_actions.tfplan.json"),
+        &scope_actions,
+        PlanScope::Changes,
+    );
+    let names: Vec<_> = changes.resources.iter().map(|r| r.name.as_str()).collect();
+    assert_eq!(names.len(), 2);
+    assert!(names.contains(&"to_create"));
+    assert!(names.contains(&"to_update"));
+    let all = parse_plan_with_scope(
+        Path::new("scope_actions.tfplan.json"),
+        &scope_actions,
+        PlanScope::All,
+    );
+    let all_names: Vec<_> = all.resources.iter().map(|r| r.name.as_str()).collect();
+    assert_eq!(all_names.len(), 4);
+    assert!(all_names.contains(&"to_create"));
+    assert!(all_names.contains(&"to_update"));
+    assert!(all_names.contains(&"noop"));
+    assert!(all_names.contains(&"to_read"));
+    assert!(!all_names.contains(&"to_delete"));
+
+    let sensitive = read_plan_fixture("s3_public_fail_sensitive_tag.tfplan.json");
+    let output = parse_plan_with_scope(
+        Path::new("s3_public_fail_sensitive_tag.tfplan.json"),
+        &sensitive,
+        PlanScope::Changes,
+    );
+    let token = rustmaninoff_ir::lookup(&output.resources[0].attributes, "tags.token");
+    assert_eq!(token.values[0].as_str(), Some(SENSITIVE_PLACEHOLDER));
+    let rendered = format!("{:?}", output.resources[0].attributes);
+    assert!(!rendered.contains("SENSITIVE_CANARY_ACL_PAIR"));
 }
