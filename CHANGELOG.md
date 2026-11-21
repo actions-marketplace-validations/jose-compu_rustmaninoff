@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.0 — 2026-11-21
+
+- The README Action section and [ACTION.md](ACTION.md) now show how to scan a saved Terraform plan JSON (`terraform show -json`, then `--framework terraform_plan`). A default directory scan does not select `terraform_plan`, so plan files in the tree are not scanned.
+- Milestone **0.6.0** is closed ([#83](https://github.com/jose-compu/rustmaninoff/issues/83)). Scanner and parser behavior unchanged. Built-in catalog remains **541** checks. Workspace crates and Action default `version` are **0.6.0**.
+
 ## 0.5.6 — 2026-11-20
 
 - `docs/fidelity.md` documents what an opt-in Terraform plan scan covers; `scripts/coverage_inventory.py` keeps that section on refresh.
