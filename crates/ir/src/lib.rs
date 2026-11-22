@@ -220,8 +220,9 @@ enum Seg {
 
 /// Resolve `path` against `root`.
 ///
-/// Dots and slashes separate keys. `[0]` is an index. Arrays of objects fan out
-/// when the next segment is a key, so `ingress.cidr_blocks` visits every rule.
+/// Dots and slashes separate keys, and a double-quoted segment is one key. `[0]`
+/// is an index. Arrays of objects fan out when the next segment is a key, so
+/// `ingress.cidr_blocks` visits every rule.
 /// Attribute path parsed once and reused across resources.
 #[derive(Clone, Debug)]
 pub struct AttrPath {
@@ -290,37 +291,66 @@ fn lookup_key<'a>(current: &'a Value, key: &str) -> Resolved<'a> {
     }
 }
 
-fn parse_path(path: &str) -> Vec<Seg> {
-    let mut segs = Vec::new();
-    for part in path.replace('/', ".").split('.') {
-        if part.is_empty() {
-            continue;
+fn push_unquoted_segment(segs: &mut Vec<Seg>, part: &str) {
+    if part.is_empty() {
+        return;
+    }
+    if let Some(bracket) = part.find('[') {
+        let name = &part[..bracket];
+        if !name.is_empty() {
+            segs.push(Seg::Key(name.to_string()));
         }
-        if let Some(bracket) = part.find('[') {
-            let name = &part[..bracket];
-            if !name.is_empty() {
-                segs.push(Seg::Key(name.to_string()));
-            }
-            let mut rest = &part[bracket..];
-            while rest.starts_with('[') {
-                let Some(end) = rest.find(']') else {
-                    break;
-                };
-                if let Ok(index) = rest[1..end].parse::<usize>() {
-                    segs.push(Seg::Index(index));
-                }
-                rest = &rest[end + 1..];
-            }
-            if !rest.is_empty() {
-                segs.push(Seg::Key(rest.to_string()));
-            }
-        } else if part.chars().all(|ch| ch.is_ascii_digit()) {
-            if let Ok(index) = part.parse::<usize>() {
+        let mut rest = &part[bracket..];
+        while rest.starts_with('[') {
+            let Some(end) = rest.find(']') else {
+                break;
+            };
+            if let Ok(index) = rest[1..end].parse::<usize>() {
                 segs.push(Seg::Index(index));
             }
-        } else {
-            segs.push(Seg::Key(part.to_string()));
+            rest = &rest[end + 1..];
         }
+        if !rest.is_empty() {
+            segs.push(Seg::Key(rest.to_string()));
+        }
+    } else if part.chars().all(|ch| ch.is_ascii_digit()) {
+        if let Ok(index) = part.parse::<usize>() {
+            segs.push(Seg::Index(index));
+        }
+    } else {
+        segs.push(Seg::Key(part.to_string()));
+    }
+}
+
+fn parse_path(path: &str) -> Vec<Seg> {
+    let mut segs = Vec::new();
+    let chars: Vec<char> = path.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        let ch = chars[i];
+        if ch == '.' || ch == '/' {
+            i += 1;
+            continue;
+        }
+        if ch == '"' {
+            i += 1;
+            let start = i;
+            while i < chars.len() && chars[i] != '"' {
+                i += 1;
+            }
+            let key: String = chars[start..i].iter().collect();
+            segs.push(Seg::Key(key));
+            if i < chars.len() && chars[i] == '"' {
+                i += 1;
+            }
+            continue;
+        }
+        let start = i;
+        while i < chars.len() && chars[i] != '.' && chars[i] != '/' && chars[i] != '"' {
+            i += 1;
+        }
+        let part: String = chars[start..i].iter().collect();
+        push_unquoted_segment(&mut segs, &part);
     }
     segs
 }
@@ -775,6 +805,47 @@ mod tests {
                 .map(|(k, v)| (k.to_string(), v))
                 .collect(),
         )
+    }
+
+    #[test]
+    fn quoted_dotted_key_is_one_segment() {
+        let annotations = obj(vec![
+            (
+                "nginx.ingress.kubernetes.io/ssl-redirect",
+                Value::Bool(true),
+            ),
+            ("nginx", Value::string("no")),
+            ("0", Value::string("zero-key")),
+            ("a[0]", Value::string("bracket-key")),
+        ]);
+        let root = obj(vec![("metadata", obj(vec![("annotations", annotations)]))]);
+        let quoted = lookup(
+            &root,
+            "metadata.annotations.\"nginx.ingress.kubernetes.io/ssl-redirect\"",
+        );
+        assert_eq!(quoted.values.len(), 1);
+        assert_eq!(quoted.values[0], &Value::Bool(true));
+        assert!(!quoted.missing);
+        let unquoted = lookup(
+            &root,
+            "metadata.annotations.nginx.ingress.kubernetes.io/ssl-redirect",
+        );
+        assert_ne!(
+            unquoted.values.first(),
+            Some(&&Value::Bool(true)),
+            "unquoted path must not hit the dotted annotation key"
+        );
+        let key_zero = lookup(&root, "metadata.annotations.\"0\"");
+        assert_eq!(key_zero.values[0].as_str(), Some("zero-key"));
+        let list = obj(vec![("list", Value::Array(vec![Value::string("idx")]))]);
+        assert_eq!(lookup(&list, "list.0").values[0].as_str(), Some("idx"));
+        let bracket_key = lookup(&root, "metadata.annotations.\"a[0]\"");
+        assert_eq!(bracket_key.values[0].as_str(), Some("bracket-key"));
+        let unclosed = lookup(&root, "metadata.annotations.\"nginx.ingress");
+        assert!(unclosed.missing);
+        assert!(unclosed.values.is_empty());
+        let nginx_alone = lookup(&root, "metadata.annotations.nginx");
+        assert_eq!(nginx_alone.values[0].as_str(), Some("no"));
     }
 
     #[test]

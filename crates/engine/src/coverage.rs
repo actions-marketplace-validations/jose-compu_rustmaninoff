@@ -508,3 +508,27 @@ fn unknown_attr_named(key: &str) -> Value {
     );
     Value::Object(map)
 }
+
+#[test]
+fn quoted_annotation_attribute_path() {
+    let attrs = serde_json::json!({
+        "metadata": {
+            "annotations": {
+                "nginx.ingress.kubernetes.io/ssl-redirect": true,
+                "nginx": false
+            }
+        }
+    });
+    let quoted_def = "  cond_type: attribute\n  attribute: metadata.annotations.\"nginx.ingress.kubernetes.io/ssl-redirect\"\n  operator: equals\n  value: \"true\"";
+    assert_eq!(
+        status_of(quoted_def, attrs.clone()),
+        Status::Passed,
+        "quoted path must read the dotted annotation key"
+    );
+    let unquoted_def = "  cond_type: attribute\n  attribute: metadata.annotations.nginx.ingress.kubernetes.io/ssl-redirect\n  operator: equals\n  value: \"true\"";
+    assert_ne!(
+        status_of(unquoted_def, attrs),
+        Status::Passed,
+        "unquoted path must not match the dotted annotation as one key"
+    );
+}
