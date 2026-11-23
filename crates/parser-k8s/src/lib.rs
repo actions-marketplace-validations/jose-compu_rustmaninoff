@@ -246,6 +246,38 @@ spec:
     }
 
     #[test]
+    fn dotted_annotation_key_via_quoted_lookup() {
+        let source = r#"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx: "no"
+spec:
+  containers:
+    - name: web
+      image: nginx:1.25
+"#;
+        let output = parse_file(Path::new("pod.yaml"), source);
+        assert_eq!(output.resources.len(), 1);
+        let attrs = &output.resources[0].attributes;
+        let quoted = lookup(
+            attrs,
+            "metadata.annotations.\"nginx.ingress.kubernetes.io/ssl-redirect\"",
+        );
+        assert_eq!(quoted.values.len(), 1);
+        assert_eq!(quoted.values[0].as_str(), Some("true"));
+        assert!(!quoted.missing);
+        let unquoted = lookup(
+            attrs,
+            "metadata.annotations.nginx.ingress.kubernetes.io/ssl-redirect",
+        );
+        assert!(unquoted.missing || unquoted.values.is_empty());
+    }
+
+    #[test]
     fn splits_documents_and_lists() {
         let source = r#"
 kind: List

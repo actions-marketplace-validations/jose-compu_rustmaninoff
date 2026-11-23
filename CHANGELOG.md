@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.1 — 2026-11-22
+
+- An attribute path may wrap one key in double quotes so dots and slashes stay part of the name (Kubernetes annotation keys). Unquoted paths are unchanged.
+- Milestone **0.7.0** stays open. Built-in catalog remains **541** checks.
+
 ## 0.6.0 — 2026-11-21
 
 - The README Action section and [ACTION.md](ACTION.md) now show how to scan a saved Terraform plan JSON (`terraform show -json`, then `--framework terraform_plan`). A default directory scan does not select `terraform_plan`, so plan files in the tree are not scanned.
