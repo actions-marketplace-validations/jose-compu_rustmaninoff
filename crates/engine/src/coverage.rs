@@ -532,3 +532,70 @@ fn quoted_annotation_attribute_path() {
         "unquoted path must not match the dotted annotation as one key"
     );
 }
+
+#[test]
+fn no_element_map_key_value_for_scalar_entries() {
+    let snippet_where = "    and:\n    - cond_type: attribute\n      attribute: key\n      operator: contains\n      value: snippet\n    - cond_type: attribute\n      attribute: value\n      operator: regex_match\n      value: '\\blua_|_lua\\b|_lua_|\\bkubernetes\\.io\\b'";
+    let lua_map = BTreeMap::from([
+        (
+            "custom-snippet".into(),
+            Value::String("lua_package_path".into()),
+        ),
+        ("note".into(), Value::String("lua_package_path".into())),
+    ]);
+    assert_eq!(
+        status_value(
+            &format!(
+                "  cond_type: no_element\n  attribute: annotations\n  where:\n{snippet_where}"
+            ),
+            Value::Object(BTreeMap::from([(
+                "annotations".into(),
+                Value::Object(lua_map),
+            )])),
+        ),
+        Status::Failed,
+        "snippet key with lua pattern must fail without requiring other keys"
+    );
+    let plain_map = BTreeMap::from([
+        ("custom-snippet".into(), Value::String("return 200;".into())),
+        ("note".into(), Value::String("lua_package_path".into())),
+    ]);
+    assert_eq!(
+        status_value(
+            &format!(
+                "  cond_type: no_element\n  attribute: annotations\n  where:\n{snippet_where}"
+            ),
+            Value::Object(BTreeMap::from([(
+                "annotations".into(),
+                Value::Object(plain_map),
+            )])),
+        ),
+        Status::Passed,
+        "plain snippet must pass even when another key mentions lua"
+    );
+    let k8s_io_map = BTreeMap::from([(
+        "nginx.ingress.kubernetes.io/configuration-snippet".into(),
+        Value::String("proxy_set_header Host kubernetes.io;".into()),
+    )]);
+    assert_eq!(
+        status_value(
+            &format!(
+                "  cond_type: no_element\n  attribute: annotations\n  where:\n{snippet_where}"
+            ),
+            Value::Object(BTreeMap::from([(
+                "annotations".into(),
+                Value::Object(k8s_io_map),
+            )])),
+        ),
+        Status::Failed,
+        "snippet value with kubernetes.io must fail without lua underscore tokens"
+    );
+    assert_eq!(
+        status_of(
+            "  cond_type: no_element\n  attribute: ingress\n  where:\n    cond_type: attribute\n    attribute: port\n    operator: equals\n    value: 22",
+            serde_json::json!({"ingress": {"one": {"port": 22}}}),
+        ),
+        Status::Failed,
+        "object-valued map entries must still expose nested attributes"
+    );
+}

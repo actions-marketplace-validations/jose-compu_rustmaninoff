@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.2 — 2026-11-23
+
+- `CKV_K8S_152` fails an Ingress when an annotation name contains `snippet` and the value matches Checkov's Lua pattern for CVE-2021-25742. Snippet keys are matched by substring, not a fixed name list.
+- On a map of scalar annotation values, `no_element` exposes each entry's `key` and `value` to the `where` clause. Object-valued map entries are unchanged.
+- Milestone **0.7.0** stays open. Built-in catalog is **542** checks.
+
 ## 0.6.1 — 2026-11-22
 
 - An attribute path may wrap one key in double quotes so dots and slashes stay part of the name (Kubernetes annotation keys). Unquoted paths are unchanged.
