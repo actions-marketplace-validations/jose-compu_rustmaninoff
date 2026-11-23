@@ -1,5 +1,7 @@
 //! Attribute condition evaluation.
 
+use std::collections::BTreeMap;
+
 use rustmaninoff_ir::{lookup_path, AttrPath, EdgeKind, Value};
 
 use crate::policy::{yaml_to_value, Severity};
@@ -363,7 +365,11 @@ fn eval_no_element(root: &Value, path: &AttrPath, where_cond: &Cond) -> Status {
         };
     }
     let mut unknown = resolved.unknown;
-    for value in elements_of(&resolved.values) {
+    for item in no_element_where_roots(&resolved.values) {
+        let value = match &item {
+            NoElementWhereRoot::Borrowed(v) => *v,
+            NoElementWhereRoot::Owned(v) => v,
+        };
         if matches!(value, Value::Unknown { .. }) {
             unknown = true;
             continue;
@@ -379,6 +385,32 @@ fn eval_no_element(root: &Value, path: &AttrPath, where_cond: &Cond) -> Status {
     } else {
         Status::Passed
     }
+}
+
+enum NoElementWhereRoot<'a> {
+    Borrowed(&'a Value),
+    Owned(Value),
+}
+
+fn no_element_where_roots<'a>(values: &'a [&'a Value]) -> Vec<NoElementWhereRoot<'a>> {
+    if values.len() == 1 {
+        if let Value::Object(map) = values[0] {
+            return map
+                .iter()
+                .map(|(key, value)| match value {
+                    Value::Object(_) => NoElementWhereRoot::Borrowed(value),
+                    other => NoElementWhereRoot::Owned(Value::Object(BTreeMap::from([
+                        ("key".into(), Value::String(key.clone())),
+                        ("value".into(), other.clone()),
+                    ]))),
+                })
+                .collect();
+        }
+    }
+    elements_of(values)
+        .into_iter()
+        .map(NoElementWhereRoot::Borrowed)
+        .collect()
 }
 
 fn elements_of<'a>(values: &[&'a Value]) -> Vec<&'a Value> {
