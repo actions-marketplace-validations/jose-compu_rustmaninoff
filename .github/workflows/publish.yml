@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Semver to publish without leading v (e.g. 0.6.2)
+        description: Semver to publish without leading v (e.g. 0.6.3)
         required: true
         type: string
 
