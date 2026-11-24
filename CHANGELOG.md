@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.3 — 2026-11-24
+
+- `CKV_K8S_153` fails an Ingress when any annotation name contains `snippet`. The value is ignored, so a snippet that does not run Lua still fails.
+- Milestone **0.7.0** stays open. Built-in catalog is **543** checks.
+
 ## 0.6.2 — 2026-11-23
 
 - `CKV_K8S_152` fails an Ingress when an annotation name contains `snippet` and the value matches Checkov's Lua pattern for CVE-2021-25742. Snippet keys are matched by substring, not a fixed name list.
