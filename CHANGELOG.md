@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.4 — 2026-11-24
+
+- `CKV_K8S_154` fails an Ingress when the same annotation name contains `snippet` and the value contains `alias`. Both substrings must be on the same annotation.
+- Milestone **0.7.0** stays open. Built-in catalog is **544** checks.
+
 ## 0.6.3 — 2026-11-24
 
 - `CKV_K8S_153` fails an Ingress when any annotation name contains `snippet`. The value is ignored, so a snippet that does not run Lua still fails.
