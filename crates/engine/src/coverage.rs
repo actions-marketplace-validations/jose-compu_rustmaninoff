@@ -599,3 +599,48 @@ fn no_element_map_key_value_for_scalar_entries() {
         "object-valued map entries must still expose nested attributes"
     );
 }
+
+#[test]
+fn command_and_args_arrays_match_prefix_and_substring() {
+    let cipher_cmd = serde_json::json!({"command": ["kube-apiserver", "--tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"]});
+    let plain_cmd = serde_json::json!({"command": ["kube-apiserver", "--tls-cert-file=/x"]});
+
+    let start_tls = "  cond_type: attribute\n  attribute: command\n  operator: starting_with\n  value: \"--tls-cipher-suites\"";
+    let end_sha = "  cond_type: attribute\n  attribute: command\n  operator: ending_with\n  value: \"SHA256\"";
+    let contains_tls = "  cond_type: attribute\n  attribute: command\n  operator: contains\n  value: \"--tls-cipher-suites\"";
+    let contains_bin = "  cond_type: attribute\n  attribute: command\n  operator: contains\n  value: \"kube-apiserver\"";
+    let not_start_tls = "  cond_type: attribute\n  attribute: command\n  operator: not_starting_with\n  value: \"--tls-cipher-suites\"";
+    let not_contains_tls = "  cond_type: attribute\n  attribute: command\n  operator: not_contains\n  value: \"--tls-cipher-suites\"";
+
+    assert_eq!(status_of(start_tls, cipher_cmd.clone()), Status::Passed);
+    assert_eq!(status_of(start_tls, plain_cmd.clone()), Status::Failed);
+    assert_eq!(status_of(end_sha, cipher_cmd.clone()), Status::Passed);
+    assert_eq!(status_of(contains_tls, cipher_cmd.clone()), Status::Passed);
+    assert_eq!(status_of(contains_bin, cipher_cmd.clone()), Status::Passed);
+    assert_eq!(status_of(not_start_tls, cipher_cmd.clone()), Status::Failed);
+    assert_eq!(status_of(not_start_tls, plain_cmd.clone()), Status::Passed);
+    assert_eq!(
+        status_of(not_contains_tls, cipher_cmd.clone()),
+        Status::Failed
+    );
+    assert_eq!(
+        status_of(not_contains_tls, plain_cmd.clone()),
+        Status::Passed
+    );
+
+    let start_tls_args = "  cond_type: attribute\n  attribute: args\n  operator: starting_with\n  value: \"--tls-cipher-suites\"";
+    let contains_tls_args = "  cond_type: attribute\n  attribute: args\n  operator: contains\n  value: \"--tls-cipher-suites\"";
+    let plain_args = serde_json::json!({"args": ["kube-apiserver", "--tls-cert-file=/x"]});
+    let cipher_args = serde_json::json!({"args": ["kube-apiserver", "--tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"]});
+
+    assert_eq!(
+        status_of(start_tls_args, cipher_args.clone()),
+        Status::Passed
+    );
+    assert_eq!(
+        status_of(start_tls_args, plain_args.clone()),
+        Status::Failed
+    );
+    assert_eq!(status_of(contains_tls_args, cipher_args), Status::Passed);
+    assert_eq!(status_of(contains_tls_args, plain_args), Status::Failed);
+}

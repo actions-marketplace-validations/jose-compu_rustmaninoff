@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.5 — 2026-11-25
+
+- `starting_with`, `ending_with`, and `contains` (and their negations) match any item of a command or args array. A prefix or a substring inside a longer argument matches. Scalar strings are unchanged.
+- Milestone **0.7.0** stays open (5 of 12 boxes). Built-in catalog is **544** checks. `CKV_K8S_105` is next.
+
 ## 0.6.4 — 2026-11-24
 
 - `CKV_K8S_154` fails an Ingress when the same annotation name contains `snippet` and the value contains `alias`. Both substrings must be on the same annotation.

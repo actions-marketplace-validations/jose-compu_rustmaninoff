@@ -1,6 +1,6 @@
 # Rustmaninoff roadmap
 
-Current release: **0.6.4**. This file is the queue for daily releases. Tick a box in the same commit that ships the work.
+Current release: **0.6.5**. This file is the queue for daily releases. Tick a box in the same commit that ships the work.
 
 Position, unchanged: Checkov-compatible CKV policies, one Rust binary, fast. Run it next to Trivy. Trivy keeps CVEs, image layers, and SBOMs. Rustmaninoff does not grow a vulnerability database ([#8](https://github.com/jose-compu/rustmaninoff/issues/8) is closed as out of scope).
 
@@ -74,8 +74,8 @@ CloudFormation's 51 policies are mostly `CKV_AWS_*_2` files. That suffix is loca
 
 Known engine limits that later boxes depend on:
 
-- Quoted attribute paths can match dotted annotation names (shipped in 0.6.1). Map annotation walks for scalar entries shipped in 0.6.2 (`CKV_K8S_152`). `CKV_K8S_153` shipped in 0.6.3; `CKV_K8S_154` shipped in 0.6.4. The next box is `starting_with` across command or args items.
-- A `starting_with` / substring match across command-array items is missing, which blocks `CKV_K8S_105` and `CKV_K8S_151`.
+- Quoted attribute paths can match dotted annotation names (shipped in 0.6.1). Map annotation walks for scalar entries shipped in 0.6.2 (`CKV_K8S_152`). `CKV_K8S_153` shipped in 0.6.3; `CKV_K8S_154` shipped in 0.6.4. Array `starting_with` and substring `contains` across command or args items shipped in 0.6.5.
+- `CKV_K8S_105` and `CKV_K8S_151` are still unimplemented (they need the cipher allow-list after `=`, not only the array match).
 - `CKV_K8S_95` is an approximation (a few exact `--request-timeout=` strings), not Checkov's duration grammar.
 - `CKV_K8S_34` does not mean what Checkov means (theirs is "Tiller is absent"; ours is secrets via `envFrom`).
 - Default plan scans report resources the plan creates or updates (attributes from `change.after`); `--plan-scope all` keeps the whole `planned_values` walk ([#80](https://github.com/jose-compu/rustmaninoff/issues/80) shipped in 0.5.4).
@@ -115,7 +115,7 @@ Goal: every id in the Kubernetes snapshot is implemented, or fidelity.md records
 - [x] `CKV_K8S_152` with pass and fail fixtures. Shipped in 0.6.2.
 - [x] `CKV_K8S_153` with pass and fail fixtures. Shipped in 0.6.3.
 - [x] `CKV_K8S_154` with pass and fail fixtures. Shipped in 0.6.4.
-- [ ] Match `starting_with` (and the substring form the check needs) across items of a command or args array.
+- [x] Match `starting_with` (and the substring form the check needs) across items of a command or args array. Shipped in 0.6.5.
 - [ ] `CKV_K8S_105` with pass and fail fixtures.
 - [ ] `CKV_K8S_151` with pass and fail fixtures.
 - [ ] `CKV_K8S_32` with pass and fail fixtures.
