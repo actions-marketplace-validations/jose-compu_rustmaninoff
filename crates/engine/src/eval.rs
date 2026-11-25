@@ -650,14 +650,12 @@ fn any_equals(value: &Value, expected: &Value) -> bool {
 }
 
 fn contains(value: &Value, expected: &Value) -> bool {
+    let needle = expected.as_str();
     match unwrap_single(value) {
-        Value::String(text) => expected
-            .as_str()
-            .map(|needle| text.contains(needle))
-            .unwrap_or(false),
-        Value::Array(items) => items.iter().any(|item| {
-            values_equal(item, expected)
-                || contains(item, expected) && !matches!(item, Value::String(_))
+        Value::String(text) => needle.map(|needle| text.contains(needle)).unwrap_or(false),
+        Value::Array(items) => items.iter().any(|item| match item {
+            Value::String(text) => needle.map(|needle| text.contains(needle)).unwrap_or(false),
+            other => values_equal(other, expected) || contains(other, expected),
         }),
         other => values_equal(other, expected),
     }
@@ -715,6 +713,17 @@ fn string_affix(value: &Value, expected: Option<&Value>, prefix: bool, positive:
                 text.ends_with(needle)
             }
         }
+        Value::Array(items) => items.iter().any(|item| {
+            item.as_str()
+                .map(|text| {
+                    if prefix {
+                        text.starts_with(needle)
+                    } else {
+                        text.ends_with(needle)
+                    }
+                })
+                .unwrap_or(false)
+        }),
         _ => false,
     };
     if positive {
