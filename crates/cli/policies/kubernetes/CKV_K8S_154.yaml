@@ -1,0 +1,70 @@
+metadata:
+  id: CKV_K8S_154
+  name: Prevent NGINX Ingress annotation snippets which contain alias statements. See CVE-2021-25742
+  category: KUBERNETES
+  severity: HIGH
+  framework: kubernetes
+  guidelines: Adapted from Checkov CKV_K8S_154. https://github.com/bridgecrewio/checkov
+resource_types:
+- Ingress
+definition:
+  cond_type: no_element
+  attribute: metadata.annotations
+  where:
+    and:
+    - cond_type: attribute
+      attribute: key
+      operator: contains
+      value: snippet
+    - cond_type: attribute
+      attribute: value
+      operator: contains
+      value: alias
+fixtures:
+  fail: |-
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    metadata:
+      name: bad
+      annotations:
+        kubernetes.io/ingress.class: nginx
+        nginx.ingress.kubernetes.io/rewrite-target: /$2
+        nginx.ingress.kubernetes.io/server-snippet: |
+          location ^~ "/test" {
+            default_type 'text/plain';
+            alias /var/run;
+          }
+    spec:
+      rules:
+      - http:
+          paths:
+          - path: /test
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 8080
+  pass: |-
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    metadata:
+      name: good
+      annotations:
+        kubernetes.io/ingress.class: nginx
+        note: alias /var/run
+        nginx.ingress.kubernetes.io/server-snippet: |
+          location / {
+            return 200 'OK';
+          }
+    spec:
+      rules:
+      - http:
+          paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: svc
+                port:
+                  number: 80

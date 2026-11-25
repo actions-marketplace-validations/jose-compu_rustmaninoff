@@ -1,0 +1,58 @@
+metadata:
+  id: CKV_K8S_153
+  name: Prevent All NGINX Ingress annotation snippets. See CVE-2021-25742
+  category: KUBERNETES
+  severity: HIGH
+  framework: kubernetes
+  guidelines: Adapted from Checkov CKV_K8S_153. https://github.com/bridgecrewio/checkov
+resource_types:
+- Ingress
+definition:
+  cond_type: no_element
+  attribute: metadata.annotations
+  where:
+    cond_type: attribute
+    attribute: key
+    operator: contains
+    value: snippet
+fixtures:
+  fail: |-
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    metadata:
+      name: bad
+      annotations:
+        kubernetes.io/ingress.class: nginx
+        nginx.ingress.kubernetes.io/server-snippet: |
+          location / {
+            return 200 'OK';
+          }
+    spec:
+      rules:
+      - http:
+          paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: svc
+                port:
+                  number: 80
+  pass: |-
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    metadata:
+      name: good
+      annotations:
+        kubernetes.io/ingress.class: nginx
+    spec:
+      rules:
+      - http:
+          paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: svc
+                port:
+                  number: 80
