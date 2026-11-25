@@ -1,27 +1,75 @@
 {
-  "machine": "local runner (see scripts/bench.sh)",
-  "date": "2026-11-02",
-  "rustmaninoff": "0.4.0 release binary",
-  "catalog_checks": 536,
-  "corpus": {
-    "terraform_files": 40,
-    "terraform_resources": 1080,
-    "cfn_files": 20,
-    "cfn_resources": 300,
-    "k8s_files": 20,
-    "k8s_resources": 160,
-    "total_resources": 1540
-  },
-  "median_ms": {
-    "rustmaninoff_full": 54,
-    "rustmaninoff_terraform": 39,
-    "rustmaninoff_cloudformation": 37,
-    "rustmaninoff_kubernetes": 46,
-    "checkov_3.3.21_full": 3503,
-    "checkov_3.3.21_terraform": 2834,
-    "trivy_0.74.0_full": 6273,
-    "rustmaninoff_real_world_s3_module": 45,
-    "checkov_real_world_s3_module": 11982
-  },
-  "notes": "Medians of 3 runs after warmup. Catalogs differ across tools."
+  "runs": [
+    {
+      "machine": "local runner (see scripts/bench.sh)",
+      "date": "2026-11-02",
+      "rustmaninoff": "0.4.0 release binary",
+      "catalog_checks": 536,
+      "corpus": {
+        "terraform_files": 40,
+        "terraform_resources": 1080,
+        "cfn_files": 20,
+        "cfn_resources": 300,
+        "k8s_files": 20,
+        "k8s_resources": 160,
+        "total_resources": 1540
+      },
+      "median_ms": {
+        "rustmaninoff_full": 54,
+        "rustmaninoff_terraform": 39,
+        "rustmaninoff_cloudformation": 37,
+        "rustmaninoff_kubernetes": 46,
+        "checkov_3.3.21_full": 3503,
+        "checkov_3.3.21_terraform": 2834,
+        "trivy_0.74.0_full": 6273,
+        "rustmaninoff_real_world_s3_module": 45,
+        "checkov_real_world_s3_module": 11982
+      },
+      "notes": "Medians of 3 runs after warmup. Catalogs differ across tools."
+    },
+    {
+      "machine": "Apple M2, 24 GB, macOS 14.8.4",
+      "date": "2026-11-25",
+      "rustmaninoff": "0.6.4 release binary (aarch64-apple-darwin)",
+      "checkov": "3.4.10",
+      "trivy": "0.76.2",
+      "catalog_checks": 544,
+      "corpus": {
+        "terraform_files": 40,
+        "terraform_resources": 1080,
+        "cfn_files": 20,
+        "cfn_resources": 300,
+        "k8s_files": 20,
+        "k8s_resources": 160,
+        "total_resources": 1540
+      },
+      "median_ms": {
+        "rustmaninoff_full": 50,
+        "rustmaninoff_terraform": 38,
+        "rustmaninoff_cloudformation": 35,
+        "rustmaninoff_kubernetes": 45,
+        "rustmaninoff_docker": 34,
+        "rustmaninoff_terraform_plan": 33,
+        "checkov_3.4.10_full": 3930,
+        "checkov_3.4.10_terraform": 3307,
+        "trivy_0.76.2_full": 5571,
+        "rustmaninoff_real_world_s3_module": 37,
+        "checkov_3.4.10_real_world_s3_module": 12387
+      },
+      "samples_ms": {
+        "rustmaninoff_full": [50, 51, 50],
+        "rustmaninoff_terraform": [38, 38, 48],
+        "rustmaninoff_cloudformation": [35, 35, 37],
+        "rustmaninoff_kubernetes": [45, 44, 45],
+        "rustmaninoff_docker": [33, 42, 34],
+        "rustmaninoff_terraform_plan": [33, 34, 33],
+        "checkov_3.4.10_full": [3930, 3882, 3985],
+        "checkov_3.4.10_terraform": [3307, 3315, 3268],
+        "trivy_0.76.2_full": [5559, 5571, 5590],
+        "rustmaninoff_real_world_s3_module": [36, 37, 37],
+        "checkov_3.4.10_real_world_s3_module": [13130, 12283, 12387]
+      },
+      "notes": "Medians of 3 runs after warmup, one session. Official release binaries. Catalogs differ across tools. The 2026-11-02 row is unchanged."
+    }
+  ]
 }

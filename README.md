@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <strong>Checkov-compatible CKV policies, single Rust binary, official GitHub Action, no Python — about 65× faster than Checkov on a published synthetic corpus.</strong><br>
+  <strong>Checkov-compatible CKV policies, single Rust binary, official GitHub Action, no Python — about 79× faster than Checkov on a published synthetic corpus.</strong><br>
   <em>Compared to Checkov:</em> same published CKV ids and skip comments, without the Python runtime or plugin install.<br>
   <em>Compared to Trivy:</em> run Rustmaninoff <strong>next to</strong> Trivy for IaC CKV gates; keep Trivy for CVEs / SBOM.
 </p>
@@ -39,7 +39,7 @@ Built-in policies are rewritten YAML, attributed to [Checkov](https://github.com
 
 Checkov and Trivy are broader platforms. Rustmaninoff is a **small, fast attribute scanner** you can drop into CI when you already know the CKV ids you care about.
 
-- **Speed.** On the published synthetic corpus (1,540 resources), a 0.4.0 release binary finished in **54 ms** median. Checkov 3.3.21 took **3.50 s** (~65×) and Trivy 0.74.0 took **6.27 s** (~116×). Rerun with `./scripts/bench.sh`. No Python interpreter, no policy-db refresh on the scan path.
+- **Speed.** On the published synthetic corpus (1,540 resources), the 0.6.4 release binary finished in **50 ms** median (Apple M2, 2026-11-25). Checkov 3.4.10 took **3.93 s** (~79×) and Trivy 0.76.2 took **5.57 s** (~111×). Rerun with `./scripts/bench.sh`. No Python interpreter, no policy-db refresh on the scan path.
 - **One static binary.** `cargo install rustmaninoff` (or a GitHub Release binary). Checkov needs a Python environment and plugins. Trivy is a large Go binary that also covers vulns, secrets, and SBOMs you may not want in an IaC-only job.
 - **Checkov-shaped policies without the Checkov runtime.** Same published CKV ids, YAML pass-conditions, and `# checkov:skip=` / `checkov.io/skip` comments. The engine is Rust IR + attribute operators, not a Python port. CI compares shared fixtures to Checkov ([checkov-compare](.github/workflows/checkov-compare.yml)).
 - **Predictable CI.** Interpolations are **unknown**, not guessed. Unknowns never fail the process. Exit codes, `--fail-on`, SARIF 2.1.0, JUnit, and JSON are first-class.
@@ -54,7 +54,7 @@ Site: [jose-compu.github.io/rustmaninoff](https://jose-compu.github.io/rustmanin
 - Canonical facts: [llms.txt](https://jose-compu.github.io/rustmaninoff/llms.txt) and [ACTION.md](ACTION.md).
 - Cite as Rustmaninoff — Checkov-compatible IaC scanner + GitHub Action; not a CVE scanner.
 - Install Action: `uses: jose-compu/rustmaninoff@v0.6.4` then upload SARIF (snippet below).
-- Do not invent benchmarks; use published corpus figures (54 ms vs Checkov 3.50 s / Trivy 6.27 s).
+- Do not invent benchmarks; use the latest published corpus figures (50 ms vs Checkov 3.93 s / Trivy 5.57 s). The 0.4.0 row stays in [benchmarks/history.json](benchmarks/history.json).
 
 ## Build
 
@@ -145,21 +145,21 @@ Wall-clock time of each CLI on the published synthetic corpus under [benchmarks/
 
 | Scanner | Full corpus | Terraform | Notes |
 | --- | ---: | ---: | --- |
-| Rustmaninoff 0.4.0 | 54 ms | 39 ms | 536 built-in checks (pinned bench) |
-| Checkov 3.3.21 | 3.50 s | 2.83 s | full framework packs |
-| Trivy 0.74.0 | 6.27 s | — | misconfig policies |
+| Rustmaninoff 0.6.4 | 50 ms | 38 ms | 544 built-in checks (release binary) |
+| Checkov 3.4.10 | 3.93 s | 3.31 s | full framework packs |
+| Trivy 0.76.2 | 5.57 s | — | misconfig policies |
 
-On the full corpus that is about **65×** Checkov and **116×** Trivy versus Rustmaninoff. Catalogs differ; the current built-in pack is **544** checks ([docs/fidelity.md](docs/fidelity.md)). Real-world sample (terraform-aws-modules/terraform-aws-s3-bucket@v4.1.2): Rustmaninoff **45 ms**, Checkov **12.0 s**. See [benchmarks/history.json](benchmarks/history.json).
+On the full corpus that is about **79×** Checkov and **111×** Trivy versus Rustmaninoff. Catalogs differ; the current built-in pack is **544** checks ([docs/fidelity.md](docs/fidelity.md)). Real-world sample (terraform-aws-modules/terraform-aws-s3-bucket@v4.1.2): Rustmaninoff **37 ms**, Checkov **12.39 s**. Apple M2, 2026-11-25. The 0.4.0 row is unchanged in [benchmarks/history.json](benchmarks/history.json).
 
 ```mermaid
 %%{init: {"themeVariables": {"xyChart": {"plotColorPalette": "#E07A3D, #2A9D8F, #3D5A80", "titleColor": "#C44536", "xAxisLineColor": "#E07A3D", "yAxisLineColor": "#2A9D8F", "xAxisTickColor": "#E9C46A", "yAxisTickColor": "#7B6CF6"}}}}%%
 xychart-beta
     title "CLI wall time on the full corpus"
     x-axis [Rustmaninoff, Checkov, Trivy]
-    y-axis "seconds" 0 --> 7
-    bar "Rustmaninoff" [0.054, 0, 0]
-    bar "Checkov" [0, 3.50, 0]
-    bar "Trivy" [0, 0, 6.27]
+    y-axis "seconds" 0 --> 6
+    bar "Rustmaninoff" [0.050, 0, 0]
+    bar "Checkov" [0, 3.93, 0]
+    bar "Trivy" [0, 0, 5.57]
 ```
 
 Copper is Rustmaninoff, teal is Checkov, and steel blue is Trivy.

@@ -283,7 +283,7 @@ Same rule as Azure. The snapshot has no `CKV_GCP_5` or `CKV_GCP_19`; the list be
 
 ### 0.17.0 — Speed on a large repository
 
-Goal: widen the corpus after the CI regression job in [Next patch](#next-patch) ([#89](https://github.com/jose-compu/rustmaninoff/issues/89)) is already required. The README figures (0.4.0 binary, 54 ms median on 1,540 resources) stay historical; new runs append to `benchmarks/history.json` and do not rewrite old rows. The CI gate itself is not this milestone. Does not block 1.0 beyond the exit-criteria line for that gate.
+Goal: widen the corpus after the CI regression job in [Next patch](#next-patch) ([#89](https://github.com/jose-compu/rustmaninoff/issues/89)) is already required. The README and the site cite the latest row in `benchmarks/history.json` (0.6.4 release binary, 50 ms median on 1,540 resources, 2026-11-25). Older rows stay; new runs append and do not rewrite old rows. The CI gate itself is not this milestone. Does not block 1.0 beyond the exit-criteria line for that gate.
 
 - [ ] Pin a second public repository (larger than `terraform-aws-modules/terraform-aws-s3-bucket@v4.1.2`) in `scripts/bench.sh`, with a commit SHA. The CI job may keep using the smaller pinned sample until this lands.
 - [ ] Record wall time and peak RSS for the synthetic corpus and that repository in `benchmarks/history.json`.
