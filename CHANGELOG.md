@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.7 — 2026-11-26
+
+- `CKV_K8S_151` fails a `kubelet` command when a token after `--tls-cipher-suites=` is not on Checkov's strong-cipher list. An unset flag still passes. Other workloads still pass. The check reads `command`, not `args`.
+- Milestone **0.7.0** stays open (7 of 12 boxes). Built-in catalog is **546** checks. `CKV_K8S_32` is next.
+
 ## 0.6.6 — 2026-11-26
 
 - `CKV_K8S_105` fails a `kube-apiserver` command when a token after `--tls-cipher-suites=` is not on Checkov's strong-cipher list. An unset flag still passes. Other workloads still pass. The check reads `command`, not `args`.
