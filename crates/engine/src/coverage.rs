@@ -599,3 +599,100 @@ fn no_element_map_key_value_for_scalar_entries() {
         "object-valued map entries must still expose nested attributes"
     );
 }
+
+#[test]
+fn command_and_args_arrays_match_prefix_and_substring() {
+    let cipher_cmd = serde_json::json!({"command": ["kube-apiserver", "--tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"]});
+    let plain_cmd = serde_json::json!({"command": ["kube-apiserver", "--tls-cert-file=/x"]});
+
+    let start_tls = "  cond_type: attribute\n  attribute: command\n  operator: starting_with\n  value: \"--tls-cipher-suites\"";
+    let end_sha = "  cond_type: attribute\n  attribute: command\n  operator: ending_with\n  value: \"SHA256\"";
+    let contains_tls = "  cond_type: attribute\n  attribute: command\n  operator: contains\n  value: \"--tls-cipher-suites\"";
+    let contains_bin = "  cond_type: attribute\n  attribute: command\n  operator: contains\n  value: \"kube-apiserver\"";
+    let not_start_tls = "  cond_type: attribute\n  attribute: command\n  operator: not_starting_with\n  value: \"--tls-cipher-suites\"";
+    let not_contains_tls = "  cond_type: attribute\n  attribute: command\n  operator: not_contains\n  value: \"--tls-cipher-suites\"";
+
+    assert_eq!(status_of(start_tls, cipher_cmd.clone()), Status::Passed);
+    assert_eq!(status_of(start_tls, plain_cmd.clone()), Status::Failed);
+    assert_eq!(status_of(end_sha, cipher_cmd.clone()), Status::Passed);
+    assert_eq!(status_of(contains_tls, cipher_cmd.clone()), Status::Passed);
+    assert_eq!(status_of(contains_bin, cipher_cmd.clone()), Status::Passed);
+    assert_eq!(status_of(not_start_tls, cipher_cmd.clone()), Status::Failed);
+    assert_eq!(status_of(not_start_tls, plain_cmd.clone()), Status::Passed);
+    assert_eq!(
+        status_of(not_contains_tls, cipher_cmd.clone()),
+        Status::Failed
+    );
+    assert_eq!(
+        status_of(not_contains_tls, plain_cmd.clone()),
+        Status::Passed
+    );
+
+    let start_tls_args = "  cond_type: attribute\n  attribute: args\n  operator: starting_with\n  value: \"--tls-cipher-suites\"";
+    let contains_tls_args = "  cond_type: attribute\n  attribute: args\n  operator: contains\n  value: \"--tls-cipher-suites\"";
+    let plain_args = serde_json::json!({"args": ["kube-apiserver", "--tls-cert-file=/x"]});
+    let cipher_args = serde_json::json!({"args": ["kube-apiserver", "--tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"]});
+
+    assert_eq!(
+        status_of(start_tls_args, cipher_args.clone()),
+        Status::Passed
+    );
+    assert_eq!(
+        status_of(start_tls_args, plain_args.clone()),
+        Status::Failed
+    );
+    assert_eq!(status_of(contains_tls_args, cipher_args), Status::Passed);
+    assert_eq!(status_of(contains_tls_args, plain_args), Status::Failed);
+}
+
+#[test]
+fn csv_within_allow_list_after_equals() {
+    let strong = "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256";
+    let allow = r#"  cond_type: attribute
+  attribute: command
+  operator: csv_within
+  value:
+    when_item: kube-apiserver
+    prefix: "--tls-cipher-suites"
+    allowed:
+      - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+      - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+      - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
+      - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+      - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
+      - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+      - TLS_RSA_WITH_AES_256_GCM_SHA384
+      - TLS_RSA_WITH_AES_128_GCM_SHA256
+"#;
+    let one_strong = serde_json::json!({"command": ["kube-apiserver", format!("--tls-cipher-suites={strong}")]} );
+    assert_eq!(status_of(allow, one_strong), Status::Passed);
+
+    let full_list = "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_RSA_WITH_AES_256_GCM_SHA384,TLS_RSA_WITH_AES_128_GCM_SHA256";
+    let all_allowed = serde_json::json!({"command": ["kube-apiserver", format!("--tls-cipher-suites={full_list}")]} );
+    assert_eq!(status_of(allow, all_allowed), Status::Passed);
+
+    let weak = serde_json::json!({"command": ["kube-apiserver", "--tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_RC4_128_SHA"]});
+    assert_eq!(status_of(allow, weak), Status::Failed);
+
+    let trailing_comma = serde_json::json!({"command": ["kube-apiserver", format!("--tls-cipher-suites={strong},")]});
+    assert_eq!(status_of(allow, trailing_comma), Status::Failed);
+
+    let leading_space = serde_json::json!({"command": ["kube-apiserver", format!("--tls-cipher-suites= {strong}")]});
+    assert_eq!(status_of(allow, leading_space), Status::Failed);
+
+    let no_flag = serde_json::json!({"command": ["kube-apiserver", "--tls-cert-file=/x"]});
+    assert_eq!(status_of(allow, no_flag), Status::Passed);
+
+    let no_equals = serde_json::json!({"command": ["kube-apiserver", "--tls-cipher-suites"]});
+    assert_eq!(status_of(allow, no_equals), Status::Failed);
+
+    let nginx_weak =
+        serde_json::json!({"command": ["nginx", "--tls-cipher-suites=TLS_RSA_WITH_RC4_128_SHA"]});
+    assert_eq!(status_of(allow, nginx_weak), Status::Passed);
+
+    let args_only = serde_json::json!({
+        "command": ["kube-apiserver"],
+        "args": ["--tls-cipher-suites=TLS_RSA_WITH_RC4_128_SHA"]
+    });
+    assert_eq!(status_of(allow, args_only), Status::Passed);
+}
