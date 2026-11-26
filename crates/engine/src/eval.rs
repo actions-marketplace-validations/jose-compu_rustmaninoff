@@ -47,6 +47,7 @@ pub enum Operator {
     NotIntersects,
     Any,
     ImageTagPinned,
+    CsvWithin,
     Unique,
 }
 
@@ -86,6 +87,7 @@ impl Operator {
             "not_intersects" => Self::NotIntersects,
             "any" => Self::Any,
             "image_tag_pinned" => Self::ImageTagPinned,
+            "csv_within" => Self::CsvWithin,
             "unique" | "is_unique" => Self::Unique,
             _ => return None,
         })
@@ -556,6 +558,7 @@ fn leaf_matches(
         Operator::NotIntersects => !intersects(value, expected),
         Operator::Any => !matches!(value, Value::Null | Value::Unknown { .. }),
         Operator::ImageTagPinned => image_tag_pinned(value),
+        Operator::CsvWithin => csv_within(value, expected),
         Operator::Unique | Operator::Exists | Operator::NotExists => false,
     }
 }
@@ -659,6 +662,55 @@ fn contains(value: &Value, expected: &Value) -> bool {
         }),
         other => values_equal(other, expected),
     }
+}
+
+fn csv_within(value: &Value, expected: Option<&Value>) -> bool {
+    let Some(config) = expected else {
+        return false;
+    };
+    let Some(prefix) = config.get("prefix").and_then(Value::as_str) else {
+        return false;
+    };
+    let allowed = match config.get("allowed") {
+        Some(Value::Array(items)) => items,
+        _ => return false,
+    };
+    let when_item = config.get("when_item").and_then(Value::as_str);
+    let items: Vec<&Value> = match unwrap_single(value) {
+        Value::Array(list) => list.iter().collect(),
+        other => vec![other],
+    };
+    if let Some(need) = when_item {
+        let has = items
+            .iter()
+            .any(|item| item.as_str().map(|text| text == need).unwrap_or(false));
+        if !has {
+            return true;
+        }
+    }
+    for item in items {
+        let Some(text) = item.as_str() else {
+            continue;
+        };
+        if !text.starts_with(prefix) {
+            continue;
+        }
+        let Some(eq_pos) = text.find('=') else {
+            return false;
+        };
+        for token in text[eq_pos + 1..].split(',') {
+            if token.is_empty() {
+                return false;
+            }
+            let ok = allowed
+                .iter()
+                .any(|allowed_item| allowed_item.as_str() == Some(token));
+            if !ok {
+                return false;
+            }
+        }
+    }
+    true
 }
 
 fn within(value: &Value, expected: Option<&Value>) -> bool {

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.6 — 2026-11-26
+
+- `CKV_K8S_105` fails a `kube-apiserver` command when a token after `--tls-cipher-suites=` is not on Checkov's strong-cipher list. An unset flag still passes. Other workloads still pass. The check reads `command`, not `args`.
+- Engine operator `csv_within` validates comma-separated tokens after `=` on command items matching a prefix.
+- Milestone **0.7.0** stays open (6 of 12 boxes). Built-in catalog is **545** checks. `CKV_K8S_151` is next.
+
 ## 0.6.5 — 2026-11-25
 
 - `starting_with`, `ending_with`, and `contains` (and their negations) match any item of a command or args array. A prefix or a substring inside a longer argument matches. Scalar strings are unchanged.
